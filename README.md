@@ -1,5 +1,7 @@
 # SoloForce
 
+> 🌐 **Language / 语言**: [English](./README.md) | [中文](./README-zh.md)
+
 <p align="center">
   <img src="./public/logo.png" alt="SoloForce Logo" width="180"/>
 </p>

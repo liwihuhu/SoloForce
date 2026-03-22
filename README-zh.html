@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoloForce - 一人公司</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.8;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            color: #333;
+            font-size: 12pt;
+        }
+        h1 { 
+            text-align: center; 
+            color: #1a1a2e; 
+            font-size: 28pt;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 14pt;
+            margin-bottom: 30px;
+        }
+        h2 { 
+            color: #16213e; 
+            border-bottom: 2px solid #0f3460; 
+            padding-bottom: 8px; 
+            margin-top: 30px;
+            font-size: 16pt;
+        }
+        h3 { 
+            color: #0f3460; 
+            font-size: 13pt;
+            margin-top: 20px;
+        }
+        img { 
+            max-width: 100%; 
+            height: auto; 
+            display: block; 
+            margin: 15px auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 15px 0; 
+            font-size: 11pt;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 10px; 
+            text-align: left; 
+        }
+        th { 
+            background: #0f3460; 
+            color: white; 
+        }
+        code { 
+            background: #f4f4f4; 
+            padding: 2px 6px; 
+            border-radius: 3px;
+            font-family: Consolas, Monaco, monospace;
+        }
+        pre { 
+            background: #f4f4f4; 
+            padding: 15px; 
+            border-radius: 5px; 
+            overflow-x: auto;
+            font-size: 10pt;
+        }
+        blockquote { 
+            border-left: 4px solid #0f3460; 
+            margin: 15px 0; 
+            padding-left: 15px; 
+            color: #666;
+            background: #f8f9fa;
+            padding: 10px 15px;
+        }
+        .logo { 
+            text-align: center; 
+            margin-bottom: 20px;
+        }
+        .logo img { 
+            width: 150px; 
+        }
+        .badges { 
+            text-align: center; 
+            margin: 20px 0; 
+        }
+        .badges img { 
+            display: inline-block; 
+            margin: 3px; 
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        .section {
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+        }
+        @media print {
+            body { 
+                font-size: 11pt; 
+                padding: 0;
+            }
+            h2 { 
+                page-break-after: avoid; 
+            }
+            img { 
+                max-height: 300px; 
+            }
+            pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="logo">
+        <img src="public/logo.png" alt="SoloForce Logo"/>
+    </div>
+    
+    <h1>SoloForce</h1>
+    <p class="subtitle">让一个人成就一家公司</p>
+
+    <div class="section">
+        <h2>📖 项目介绍</h2>
+        <p><strong>SoloForce（一人公司）</strong> 是一款基于 AI 的智能工作流编排系统。</p>
+        <p>在数字经济时代，个人或小型团队如何高效管理多个 AI 助手完成复杂任务？SoloForce 给出了答案——通过 AI 技术实现<strong>一个人管理一个"数字团队"</strong>的梦想。</p>
+        
+        <blockquote>
+            <strong>未来的企业将不再依赖传统的"人力资源"，而是转向"数字人力资源"</strong><br>
+            一个人类 CEO + N 个 AI 数字员工 = 一个高效运转的"一人公司"
+        </blockquote>
+    </div>
+
+    <div class="section">
+        <h2>📸 项目预览</h2>
+        <p>团队拓扑、员工管理、团队管理、任务中心</p>
+    </div>
+
+    <div class="section">
+        <h2>✨ 核心特性</h2>
+        
+        <h3>1️⃣ 团队拓扑可视化</h3>
+        <p>图形化展示"数字员工"组织和隶属关系，支持拖拽连线建立管理流程。</p>
+        
+        <h3>2️⃣ 自定义数字员工</h3>
+        <p>创建和管理专属的数字员工，定义角色、技能和职责，打造你的虚拟团队。</p>
+        
+        <h3>3️⃣ AI 智能任务分发</h3>
+        <p>输入任务后，AI 自动分析并分发给合适的"数字员工"，模拟真实公司的任务分配流程。</p>
+        
+        <h3>4️⃣ OpenClaw 执行集成</h3>
+        <p>任务执行完成后，提取可执行的技术命令，一键发送到 OpenClaw 执行。</p>
+        
+        <h3>5️⃣ 多团队管理</h3>
+        <p>支持创建多个虚拟团队，每个团队有独立的员工配置和拓扑关系。</p>
+    </div>
+
+    <div class="section">
+        <h2>🛠️ 技术栈</h2>
+        <table>
+            <tr><th>类别</th><th>技术</th></tr>
+            <tr><td>前端</td><td>React 18 + TypeScript + Vite</td></tr>
+            <tr><td>可视化</td><td>React Flow</td></tr>
+            <tr><td>后端</td><td>Express + Node.js</td></tr>
+            <tr><td>AI 引擎</td><td>OpenAI 兼容 API</td></tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>🚀 快速开始</h2>
+        
+        <h3>安装</h3>
+        <pre>git clone https://github.com/yourusername/SoloForce.git
+cd SoloForce
+npm install</pre>
+        
+        <h3>配置</h3>
+        <pre>cp .env.example .env
+# 编辑 .env 文件，配置你的 API Key</pre>
+        
+        <h3>启动</h3>
+        <pre># 终端1: 启动后端服务
+npm run server
+
+# 终端2: 启动前端服务
+npm run dev</pre>
+        <p>访问 http://localhost:5300</p>
+    </div>
+
+    <div class="section">
+        <h2>📁 项目结构</h2>
+        <pre>SoloForce/
+├── public/           # 静态资源
+├── src/              # 前端源码
+│   ├── components/   # React 组件
+│   ├── pages/        # 页面组件
+│   └── store.ts      # 状态管理
+├── server.ts         # Express 后端服务
+└── package.json      # 项目配置</pre>
+    </div>
+
+    <div class="section">
+        <h2>🔧 配置说明</h2>
+        
+        <h3>环境变量</h3>
+        <pre>PORT=5301
+
+# 大模型 API (必需)
+OPENAI_BASE_URL=https://api.siliconflow.cn/v1
+OPENAI_MODEL=qwen2.5-7b-instruct
+OPENAI_API_KEY=your_api_key_here
+
+# OpenClaw 配置 (可选)
+OPENCLAW_URL=http://127.0.0.1:18789
+OPENCLAW_TOKEN=your_token</pre>
+        
+        <h3>端口说明</h3>
+        <table>
+            <tr><th>服务</th><th>端口</th><th>说明</th></tr>
+            <tr><td>前端</td><td>5300</td><td>Vite 开发服务器</td></tr>
+            <tr><td>后端</td><td>5301</td><td>Express API 服务</td></tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>📖 使用指南</h2>
+        <table>
+            <tr><th>步骤</th><th>操作</th><th>说明</th></tr>
+            <tr><td>1️⃣</td><td>创建团队</td><td>在"团队管理"页面创建虚拟团队</td></tr>
+            <tr><td>2️⃣</td><td>建立拓扑</td><td>拖拽连接"数字员工"节点</td></tr>
+            <tr><td>3️⃣</td><td>发布任务</td><td>在命令中心输入任务，AI 自动分发</td></tr>
+            <tr><td>4️⃣</td><td>执行命令</td><td>确认后发送至 OpenClaw 执行</td></tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>🔮 未来规划</h2>
+        <ul>
+            <li><strong>v2.0</strong> - 多模态交互：语音输入/输出、图片/文件上传</li>
+            <li><strong>v2.1</strong> - 智能进化：AI 自主学习、智能分析</li>
+            <li><strong>v2.2</strong> - 生态扩展：更多 AI 平台、插件市场</li>
+            <li><strong>v3.0</strong> - 数字劳动力市场</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🤝 寻求合作</h2>
+        <p>SoloForce 现寻求志同道合的合作伙伴：</p>
+        <ul>
+            <li>🌐 <strong>技术合作伙伴</strong> - AI Agent 平台、云服务商</li>
+            <li>📢 <strong>推广渠道</strong> - 科技博主，社区达人</li>
+            <li>💡 <strong>产品顾问</strong> - 产品设计、用户体验</li>
+            <li>💰 <strong>投资支持</strong> - 天使投资/种子轮</li>
+        </ul>
+        
+        <p><strong>联系我们：</strong> hello@soloforce.ai</p>
+    </div>
+
+    <div class="section">
+        <h2>📄 许可证</h2>
+        <p>本项目基于 MIT 许可证开源。</p>
+    </div>
+
+    <div class="footer">
+        <p><strong>SoloForce - 让一个人成就一家公司</strong></p>
+        <p>⭐ 如果这个项目对你有帮助，欢迎 Star 支持！</p>
+    </div>
+</body>
+</html>

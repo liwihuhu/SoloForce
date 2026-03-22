@@ -1,0 +1,148 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #0F172A;
+  color: #E2E8F0;
+}
+
+/* 深海科技风全局样式 */
+:root {
+  --primary-dark: #0F172A;
+  --primary-darker: #020617;
+  --accent-cyan: #06B6D4;
+  --accent-blue: #3B82F6;
+  --accent-purple: #8B5CF6;
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(148, 163, 184, 0.1);
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+}
+
+/* React Flow 样式覆盖 */
+.react-flow__node {
+  cursor: grab;
+}
+
+.react-flow__node:active {
+  cursor: grabbing;
+}
+
+.react-flow__handle {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.react-flow__controls {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.react-flow__controls-button {
+  background: rgba(30, 41, 59, 0.9) !important;
+  border: none !important;
+  color: #E2E8F0 !important;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(6, 182, 212, 0.3) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: #06B6D4 !important;
+}
+
+.react-flow__minimap {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(6, 182, 212, 0.2) !important;
+}
+
+.react-flow__background pattern circle {
+  fill: rgba(6, 182, 212, 0.1) !important;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.5);
+}
+
+/* 按钮样式 */
+button {
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+/* 输入框样式 */
+input, textarea, select {
+  background: rgba(30, 41, 59, 0.8) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  color: #F1F5F9 !important;
+  border-radius: 8px !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: #06B6D4 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2) !important;
+}
+
+/* 卡片玻璃拟态 */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+}
+
+/* 渐变文字 */
+.gradient-text {
+  background: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 发光效果 */
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}

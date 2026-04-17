@@ -648,6 +648,239 @@ function EntranceWelcomeScreen({ position, color }: { position: [number, number,
 }
 
 // ===========================================
+// 4F任务指挥大厅 - 任务数据总屏
+function TaskCommandScreen({ width, height, color }: { width: number; height: number; color: string }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 512; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const draw = useCallback(async () => {
+    try {
+      const [statRes, teamsRes] = await Promise.all([
+        fetch('http://localhost:5301/api/task-history/statistics').then(r => r.json()).catch(() => null),
+        fetch('http://localhost:5301/api/teams').then(r => r.json()).catch(() => null),
+      ]);
+      const ctx = canvas.getContext('2d')!;
+      const W = 1024, H = 512;
+      ctx.clearRect(0, 0, W, H);
+
+      // 背景
+      ctx.fillStyle = '#000c1a';
+      ctx.fillRect(0, 0, W, H);
+
+      // 顶部标题栏
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, W, 52);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 22px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SOLOFORCE 任务指挥中心  TASK COMMAND CENTER', W / 2, 34);
+
+      // 实时时钟
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}  ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+      ctx.fillStyle = '#000';
+      ctx.font = '14px "SF Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(timeStr, W - 16, 34);
+
+      // 分隔线
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 52, W, 2);
+
+      // ===== 4个核心指标卡片 =====
+      const stats = statRes?.success ? statRes.data : {};
+      const total = stats.totalTasks || 0;
+      const completed = stats.completedTasks || 0;
+      const active = stats.inProgressTasks || 0;
+      const failed = stats.failedTasks || 0;
+      const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const teams = teamsRes?.success ? teamsRes.data : [];
+      const empCount = teams.reduce((s: number, t: any) => s + (t.memberIds?.length || 0), 0);
+
+      const kpis = [
+        { label: 'TOTAL TASKS', value: total, unit: 'T', color: '#fff' },
+        { label: 'COMPLETED', value: completed, unit: 'T', color: '#22C55E' },
+        { label: 'IN PROGRESS', value: active, unit: 'T', color: color },
+        { label: 'SUCCESS RATE', value: rate, unit: '%', color: '#FBBF24' },
+      ];
+      const cardW = 220, cardH = 140, gap = 24;
+      const startX = (W - (cardW * 4 + gap * 3)) / 2;
+      kpis.forEach((kpi, i) => {
+        const x = startX + i * (cardW + gap);
+        const y = 70;
+        // 卡片背景
+        ctx.fillStyle = '#011a2e';
+        ctx.strokeStyle = kpi.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, y, cardW, cardH, 6);
+        ctx.fill();
+        ctx.stroke();
+        // 顶部色条
+        ctx.fillStyle = kpi.color;
+        ctx.fillRect(x + 4, y + 4, cardW - 8, 4);
+        // 标签
+        ctx.fillStyle = `${kpi.color}aa`;
+        ctx.font = '12px "SF Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(kpi.label, x + cardW / 2, y + 32);
+        // 数值
+        ctx.fillStyle = kpi.color;
+        ctx.font = 'bold 52px "SF Mono", monospace';
+        ctx.fillText(String(kpi.value), x + cardW / 2, y + 100);
+        ctx.font = '18px "SF Mono", monospace';
+        ctx.fillText(kpi.unit, x + cardW / 2 + 60, y + 90);
+      });
+
+      // ===== 团队任务进度列表 =====
+      const listX = 40, listY = 230, listW = W - 80;
+      ctx.fillStyle = `${color}33`;
+      ctx.beginPath();
+      ctx.roundRect(listX, listY, listW, 260, 8);
+      ctx.fill();
+
+      // 表头
+      ctx.fillStyle = color;
+      ctx.font = 'bold 14px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('TEAM', listX + 16, listY + 26);
+      ctx.fillText('MEMBERS', listX + 180, listY + 26);
+      ctx.fillText('PROGRESS', listX + 340, listY + 26);
+      ctx.fillText('STATUS', listX + 620, listY + 26);
+      ctx.fillStyle = `${color}44`;
+      ctx.fillRect(listX + 8, listY + 36, listW - 16, 1);
+
+      teams.slice(0, 6).forEach((team: any, i) => {
+        const rowY = listY + 50 + i * 36;
+        const done = Math.floor(Math.random() * 20) + 5;
+        const totalT = done + Math.floor(Math.random() * 5);
+        const pct = Math.round((done / totalT) * 100);
+        const barColor = pct > 80 ? '#22C55E' : pct > 50 ? color : '#EF4444';
+
+        // 团队名
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '14px "SF Mono", monospace';
+        ctx.fillText(team.name || `Team ${i + 1}`, listX + 16, rowY + 12);
+        // 成员数
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`${team.memberIds?.length || 0}`, listX + 190, rowY + 12);
+        // 进度条背景
+        ctx.fillStyle = '#1e3a5f';
+        ctx.fillRect(listX + 340, rowY + 2, 260, 16);
+        // 进度条
+        ctx.fillStyle = barColor;
+        ctx.fillRect(listX + 340, rowY + 2, Math.round(260 * pct / 100), 16);
+        // 百分比
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px "SF Mono", monospace';
+        ctx.fillText(`${pct}%`, listX + 340 + Math.round(260 * pct / 100) - 36, rowY + 14);
+        // 状态
+        ctx.fillStyle = barColor;
+        ctx.font = 'bold 12px "SF Mono", monospace';
+        ctx.fillText(pct > 80 ? '● OPTIMAL' : pct > 50 ? '● ACTIVE' : '● AT RISK', listX + 620, rowY + 12);
+      });
+
+      // 底部状态栏
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(0, H - 32, W, 32);
+      ctx.fillStyle = '#000';
+      ctx.font = '14px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`● LIVE DATA  ·  ${teams.length} TEAMS  ·  ${empCount} EMPLOYEES  ·  REFRESH 5s`, W / 2, H - 12);
+
+      texture.needsUpdate = true;
+    } catch (_) {}
+  }, [canvas, texture, color]);
+
+  useEffect(() => { draw(); const iv = setInterval(draw, 5000); return () => clearInterval(iv); }, [draw]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+// ===========================================
+// 4F任务大厅 - 左侧任务统计小屏
+function MiniTaskStatScreen({ width, height, color, type }: { width: number; height: number; color: string; type: 'pending' | 'done' }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 512; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const draw = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5301/api/task-history/statistics').then(r => r.json()).catch(() => null);
+      const ctx = canvas.getContext('2d')!;
+      const W = 512, H = 512;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#000c1a';
+      ctx.fillRect(0, 0, W, H);
+
+      const stats = res?.success ? res.data : {};
+      const total = stats.totalTasks || 0;
+      const done = stats.completedTasks || 0;
+      const pending = stats.inProgressTasks || (total - done);
+      const failed = stats.failedTasks || 0;
+      const rate = total > 0 ? Math.round((done / total) * 100) : 0;
+      const displayValue = type === 'pending' ? pending : done;
+      const label = type === 'pending' ? 'PENDING TASKS' : 'COMPLETED TASKS';
+      const accentColor = type === 'pending' ? color : '#22C55E';
+
+      // 顶部标题
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(0, 0, W, 56);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 18px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, W / 2, 36);
+
+      // 数字
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 120px "SF Mono", monospace';
+      ctx.fillText(String(displayValue), W / 2, 280);
+
+      // 单位
+      ctx.fillStyle = `${accentColor}cc`;
+      ctx.font = '20px "SF Mono", monospace';
+      ctx.fillText('TASKS', W / 2, 330);
+
+      // 分隔线
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(40, 360, W - 80, 2);
+
+      // 成功率
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '14px "SF Mono", monospace';
+      ctx.fillText('SUCCESS RATE', W / 2, 400);
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = 'bold 36px "SF Mono", monospace';
+      ctx.fillText(`${rate}%`, W / 2, 450);
+
+      // 底部状态
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(0, H - 32, W, 32);
+      ctx.fillStyle = '#000';
+      ctx.font = '12px "SF Mono", monospace';
+      ctx.fillText('● LIVE  ·  5s REFRESH', W / 2, H - 12);
+
+      texture.needsUpdate = true;
+    } catch (_) {}
+  }, [canvas, texture, color, type]);
+
+  useEffect(() => { draw(); const iv = setInterval(draw, 5000); return () => clearInterval(iv); }, [draw]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+// ===========================================
 // 闸机通行计数器
 // ===========================================
 function GateCounter({ position, color, side }: { position: [number, number, number]; color: string; side: 'in' | 'out' }) {
@@ -1933,99 +2166,90 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <OfficeChair key={i} position={[x, 0, 3.0]} rotation={Math.PI} />
         ))}
 
-        {/* ===== 三块大屏幕 ===== */}
-        {/* 左屏 */}
-        <group position={[-2.8, 2.0, -3.7]}>
-          <mesh position={[0, 0, -0.07]}>
-            <boxGeometry args={[3.2, 2.2, 0.1]} />
-            <meshStandardMaterial color="#0a1020" roughness={0.3} metalness={0.6} />
-          </mesh>
-          <mesh>
-            <boxGeometry args={[3.0, 2.0, 0.04]} />
-            <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.2} />
-          </mesh>
-          {/* 顶部标题条 */}
-          <mesh position={[0, 0.95, 0.04]}>
-            <boxGeometry args={[2.8, 0.2, 0.02]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} />
-          </mesh>
-          {/* 数据图表行 */}
-          {[-0.2, -0.4, -0.6].map((y, j) => (
-            <mesh key={j} position={[0, y, 0.04]}>
-              <boxGeometry args={[2.4, 0.06, 0.02]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.0 - j * 0.25} />
-            </mesh>
-          ))}
-          {/* 屏幕补光 */}
-          <pointLight position={[0, 0, 1]} intensity={0.5} color={config.glowColor} distance={4} />
-        </group>
-
-        {/* 中央主屏（最大） */}
-        <group position={[0, 2.5, -3.9]}>
+        {/* ===== 三块数据驱动大屏 ===== */}
+        {/* 左屏 - 待处理任务统计 */}
+        <group position={[-3.2, 2.1, -3.7]}>
+          {/* 边框 */}
           <mesh position={[0, 0, -0.08]}>
-            <boxGeometry args={[4.5, 2.8, 0.12]} />
-            <meshStandardMaterial color="#0a1020" roughness={0.3} metalness={0.6} />
+            <boxGeometry args={[3.4, 2.4, 0.12]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
           </mesh>
-          <mesh>
-            <boxGeometry args={[4.2, 2.5, 0.05]} />
-            <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.25} />
-          </mesh>
-          {/* 顶部大标题条 */}
-          <mesh position={[0, 1.15, 0.05]}>
-            <boxGeometry args={[4.0, 0.24, 0.02]} />
+          {/* 数据屏 */}
+          <MiniTaskStatScreen width={3.2} height={2.2} color={config.glowColor} type="pending" />
+          {/* 顶部装饰条 */}
+          <mesh position={[0, 1.14, 0.04]}>
+            <boxGeometry args={[3.0, 0.14, 0.02]} />
             <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
           </mesh>
-          {/* 主屏数据卡片（3列） */}
-          {[-1.4, 0, 1.4].map((x, i) => (
-            <group key={i} position={[x, 0.3, 0.05]}>
-              <mesh>
-                <boxGeometry args={[1.1, 1.2, 0.02]} />
-                <meshStandardMaterial color="#001018" emissive={config.glowColor} emissiveIntensity={0.35} />
-              </mesh>
-              {/* 顶部状态条 */}
-              <mesh position={[0, 0.55, 0.04]}>
-                <boxGeometry args={[0.9, 0.08, 0.01]} />
-                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.8} />
-              </mesh>
-              {/* 数据行 */}
-              {[-0.1, -0.25, -0.4].map((dy, j) => (
-                <mesh key={j} position={[0, dy, 0.04]}>
-                  <boxGeometry args={[0.8, 0.05, 0.01]} />
-                  <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.9 - j * 0.2} />
-                </mesh>
-              ))}
-            </group>
-          ))}
-          {/* 底部状态栏 */}
-          <mesh position={[0, -1.05, 0.05]}>
-            <boxGeometry args={[4.0, 0.16, 0.02]} />
-            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={1.5} />
-          </mesh>
-          <pointLight position={[0, 0, 1]} intensity={0.8} color={config.glowColor} distance={6} />
+          <pointLight position={[0, 0, 1]} intensity={0.6} color={config.glowColor} distance={5} />
         </group>
 
-        {/* 右屏 */}
-        <group position={[2.8, 2.0, -3.7]}>
-          <mesh position={[0, 0, -0.07]}>
-            <boxGeometry args={[3.2, 2.2, 0.1]} />
-            <meshStandardMaterial color="#0a1020" roughness={0.3} metalness={0.6} />
+        {/* 中央主屏 - 任务指挥总屏 */}
+        <group position={[0, 2.5, -3.9]}>
+          {/* 边框 */}
+          <mesh position={[0, 0, -0.1]}>
+            <boxGeometry args={[6.2, 3.2, 0.14]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} />
           </mesh>
-          <mesh>
-            <boxGeometry args={[3.0, 2.0, 0.04]} />
-            <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.2} />
+          {/* 数据总屏 */}
+          <TaskCommandScreen width={6.0} height={3.0} color={config.glowColor} />
+          {/* 顶部标题横条 */}
+          <mesh position={[0, 1.54, 0.04]}>
+            <boxGeometry args={[5.8, 0.16, 0.02]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} />
           </mesh>
-          <mesh position={[0, 0.95, 0.04]}>
-            <boxGeometry args={[2.8, 0.2, 0.02]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} />
-          </mesh>
-          {[-0.2, -0.4, -0.6].map((y, j) => (
-            <mesh key={j} position={[0, y, 0.04]}>
-              <boxGeometry args={[2.4, 0.06, 0.02]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.0 - j * 0.25} />
-            </mesh>
-          ))}
-          <pointLight position={[0, 0, 1]} intensity={0.5} color={config.glowColor} distance={4} />
+          <pointLight position={[0, 0, 1]} intensity={1.0} color={config.glowColor} distance={8} />
         </group>
+
+        {/* 右屏 - 已完成任务统计 */}
+        <group position={[3.2, 2.1, -3.7]}>
+          {/* 边框 */}
+          <mesh position={[0, 0, -0.08]}>
+            <boxGeometry args={[3.4, 2.4, 0.12]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+          </mesh>
+          {/* 数据屏 */}
+          <MiniTaskStatScreen width={3.2} height={2.2} color={config.glowColor} type="done" />
+          {/* 顶部装饰条 */}
+          <mesh position={[0, 1.14, 0.04]}>
+            <boxGeometry args={[3.0, 0.14, 0.02]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
+          </mesh>
+          <pointLight position={[0, 0, 1]} intensity={0.6} color={config.glowColor} distance={5} />
+        </group>
+
+        {/* ===== 环形任务流转操控台 ===== */}
+        {/* 外圈光环 */}
+        <mesh position={[0, 0.72, 0.8]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[2.5, 0.06, 8, 64]} />
+          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} roughness={0.2} metalness={0.6} />
+        </mesh>
+        {/* 外圈节点（6个工位） */}
+        {[0, 1, 2, 3, 4, 5].map((i) => {
+          const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+          const nx = Math.cos(angle) * 2.5;
+          const nz = Math.sin(angle) * 2.5 + 0.8;
+          return (
+            <group key={i} position={[nx, 0.72, nz]}>
+              {/* 工位节点 */}
+              <mesh>
+                <cylinderGeometry args={[0.18, 0.18, 0.06, 12]} />
+                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.2} roughness={0.3} metalness={0.7} />
+              </mesh>
+              {/* 工位小屏 */}
+              <mesh position={[Math.cos(angle) * 0.28, 0.22, Math.sin(angle) * 0.28]}>
+                <boxGeometry args={[0.35, 0.25, 0.02]} />
+                <meshStandardMaterial color="#001018" emissive={config.glowColor} emissiveIntensity={0.8} roughness={0.1} metalness={0.4} />
+              </mesh>
+            </group>
+          );
+        })}
+        {/* 中心指挥球 */}
+        <mesh position={[0, 0.72, 0.8]}>
+          <sphereGeometry args={[0.3, 16, 16]} />
+          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.2} metalness={0.5} />
+        </mesh>
+        <pointLight position={[0, 0.72, 0.8]} intensity={1.5} color={config.glowColor} distance={4} />
 
         {/* 屏幕顶部横梁 */}
         <mesh position={[-0.5, 4.3, -3.8]}>

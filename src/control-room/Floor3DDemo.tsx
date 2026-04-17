@@ -648,60 +648,54 @@ function EntranceWelcomeScreen({ position, color }: { position: [number, number,
 }
 
 // ===========================================
-// 6F OpenClaw机房 - 超级大脑核心状态屏 (大画幅仪表盘)
+// 6F OpenClaw机房 - 超级大脑核心状态屏
 function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; height: number; color: string; ocStatus: any }) {
   const meshRef = useRef<THREE.Mesh>(null!);
   const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 512; return c; }, []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
 
-  const draw = useCallback(() => {
+  useEffect(() => {
     const ctx = canvas.getContext('2d')!;
     const W = 1024, H = 512;
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#000c1a';
     ctx.fillRect(0, 0, W, H);
-
     const d = ocStatus || {};
     const gw = d.gateway || {};
     const ag = d.agents || {};
     const mem = d.memory || {};
     const ts = d.tasks || {};
     const ss = d.sessions || {};
-    const allOk = gw.reachable;
-
-    // === HEADER ===
+    // Header
     ctx.fillStyle = color;
     ctx.fillRect(0, 0, W, 60);
     ctx.fillStyle = '#000';
-    ctx.font = 'bold 28px "SF Mono", monospace';
+    ctx.font = 'bold 26px "SF Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillText('OPENCLAW SYSTEM STATUS', W / 2, 40);
-
-    // === BIG STATUS INDICATOR ===
-    const statusX = W - 200;
-    ctx.fillStyle = allOk ? '#22C55E' : '#EF4444';
+    // Gateway circle (top right)
+    const gColor = gw.reachable ? '#22C55E' : '#EF4444';
+    ctx.fillStyle = gColor;
     ctx.beginPath();
-    ctx.arc(statusX, 100, 50, 0, Math.PI * 2);
+    ctx.arc(W - 100, 100, 44, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = allOk ? '#000' : '#fff';
-    ctx.font = 'bold 16px "SF Mono", monospace';
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 14px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(allOk ? 'ONLINE' : 'OFFLINE', statusX, 96);
-    ctx.fillText(`${gw.latency || 0}ms`, statusX, 116);
-
-    // === 4 BIG KPI CARDS ===
-    const cardW = 210, cardH = 150, gap = 24;
+    ctx.fillText(gw.reachable ? 'ONLINE' : 'OFFLINE', W - 100, 96);
+    ctx.fillText(gw.latency ? gw.latency + 'ms' : '0ms', W - 100, 114);
+    // 4 KPI cards
+    const cardW = 215, cardH = 160, gap = 20;
     const cards = [
-      { label: 'AGENTS', value: ag.count || 0, sub: `${ag.sessions || 0} sessions`, color: '#F472B6' },
-      { label: 'TASKS', value: ts.active || 0, sub: `queued ${ts.queued || 0} | running ${ts.running || 0}`, color: '#60A5FA' },
-      { label: 'MEMORY', value: mem.files || 0, sub: `${mem.chunks || 0} chunks`, color: '#4ADE80' },
-      { label: 'SESSIONS', value: ss.active || 0, sub: `tracked ${ts.tracked || 0} jobs`, color: '#A78BFA' },
+      { label: 'AGENTS', value: ag.count || 0, sub: (ag.sessions || 0) + ' sessions', color: '#F472B6' },
+      { label: 'ACTIVE', value: ts.active || 0, sub: 'queued ' + (ts.queued || 0) + ' | running ' + (ts.running || 0), color: '#60A5FA' },
+      { label: 'MEMORY', value: mem.files || 0, sub: (mem.chunks || 0) + ' chunks', color: '#4ADE80' },
+      { label: 'SESSIONS', value: ss.active || 0, sub: (ts.tracked || 0) + ' tracked', color: '#A78BFA' },
     ];
     const startX = 40;
     cards.forEach((card, i) => {
       const x = startX + i * (cardW + gap);
-      const y = 90;
-      // Card bg
+      const y = 85;
       ctx.fillStyle = '#0a1828';
       ctx.strokeStyle = card.color;
       ctx.lineWidth = 2;
@@ -709,39 +703,31 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
       ctx.roundRect(x, y, cardW, cardH, 8);
       ctx.fill();
       ctx.stroke();
-      // Color bar top
       ctx.fillStyle = card.color;
       ctx.fillRect(x + 4, y + 4, cardW - 8, 5);
-      // Label
       ctx.fillStyle = card.color;
-      ctx.font = 'bold 14px "SF Mono", monospace';
+      ctx.font = 'bold 13px "SF Mono", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(card.label, x + 14, y + 36);
-      // Big value
+      ctx.fillText(card.label, x + 14, y + 32);
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 56px "SF Mono", monospace';
-      ctx.fillText(String(card.value), x + 14, y + 108);
-      // Sub
+      ctx.font = 'bold 58px "SF Mono", monospace';
+      ctx.fillText(String(card.value), x + 14, y + 112);
       ctx.fillStyle = '#94a3b8';
       ctx.font = '12px "SF Mono", monospace';
-      ctx.fillText(card.sub, x + 14, y + 135);
+      ctx.fillText(card.sub, x + 14, y + 140);
     });
-
-    // === BOTTOM BAR ===
+    // System bar
     ctx.fillStyle = '#22C55E';
     ctx.fillRect(0, H - 44, W, 44);
     ctx.fillStyle = '#000';
-    ctx.font = 'bold 16px "SF Mono", monospace';
+    ctx.font = 'bold 15px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('● ALL SYSTEMS OPERATIONAL  ·  REFRESH 5s', W / 2, H - 16);
-
+    ctx.fillText('ALL SYSTEMS OPERATIONAL  |  5s REFRESH', W / 2, H - 16);
     texture.needsUpdate = true;
-  }, [canvas, texture, color, ocStatus]);
-
-  useEffect(() => { draw(); }, [draw]);
+  }, [ocStatus]);
 
   return (
-    <mesh ref={meshRef} position={[0, 0, 0.04]}>
+    <mesh ref={meshRef}>
       <planeGeometry args={[width, height]} />
       <meshBasicMaterial map={texture} />
     </mesh>
@@ -749,84 +735,72 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
 }
 
 // ===========================================
-// 6F OpenClaw机房 - 单个终端数据屏幕 (大画幅)
+// 6F OpenClaw机房 - 单个终端数据屏幕
 function TerminalScreen({ width, height, color, data, statusColor }: { width: number; height: number; color: string; data: any; statusColor: string }) {
   const meshRef = useRef<THREE.Mesh>(null!);
-  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 384; return c; }, []);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 512; return c; }, []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
 
-  const draw = useCallback(() => {
+  useEffect(() => {
     const ctx = canvas.getContext('2d')!;
-    const W = 512, H = 384;
+    const W = 512, H = 512;
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#000c1a';
     ctx.fillRect(0, 0, W, H);
-
     if (!data) {
       ctx.fillStyle = '#374151';
-      ctx.font = 'bold 20px "SF Mono", monospace';
+      ctx.font = 'bold 24px "SF Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillText('CONNECTING...', W / 2, H / 2);
       texture.needsUpdate = true;
       return;
     }
-
-    // Top status bar (thick colored band)
+    // Top bar
     ctx.fillStyle = statusColor;
-    ctx.fillRect(0, 0, W, 12);
-
-    // Status badge (top right)
+    ctx.fillRect(0, 0, W, 14);
+    // Status badge
     ctx.fillStyle = statusColor;
     ctx.beginPath();
-    ctx.roundRect(W - 130, 20, 115, 32, 4);
+    ctx.roundRect(W - 140, 24, 126, 36, 4);
     ctx.fill();
     ctx.fillStyle = '#000';
     ctx.font = 'bold 14px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(data.status || 'OFFLINE', W - 72, 42);
-
-    // BIG main number
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 120px "SF Mono", monospace';
+    ctx.fillText(data.status || 'OFFLINE', W - 77, 48);
+    // BIG number
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 160px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(String(data.value1 || 0), W / 2, 200);
-
-    // Unit below number
+    ctx.fillText(String(data.value1 || 0), W / 2, 280);
+    // Unit
     ctx.fillStyle = color;
-    ctx.font = 'bold 22px "SF Mono", monospace';
-    ctx.fillText(data.unit || '', W / 2, 240);
-
-    // Progress bar background
-    const barW = W - 80;
+    ctx.font = 'bold 24px "SF Mono", monospace';
+    ctx.fillText(data.unit || '', W / 2, 330);
+    // Progress bar
+    const ratio = data.value2 ? Math.min(data.value1 / data.value2, 1) : 1.0;
     ctx.fillStyle = '#1e3a5f';
     ctx.beginPath();
-    ctx.roundRect(40, 270, barW, 18, 4);
+    ctx.roundRect(30, 370, W - 60, 24, 6);
     ctx.fill();
-    // Progress bar fill
-    const ratio = data.value2 !== undefined ? data.value1 / (data.value2 || 1) : 1.0;
     ctx.fillStyle = statusColor;
     ctx.beginPath();
-    ctx.roundRect(40, 270, barW * Math.min(ratio, 1), 18, 4);
+    ctx.roundRect(30, 370, (W - 60) * ratio, 24, 6);
     ctx.fill();
-
-    // Secondary value + tertiary
+    // Secondary
     if (data.value2 !== undefined) {
       ctx.fillStyle = color;
-      ctx.font = 'bold 32px "SF Mono", monospace';
+      ctx.font = 'bold 36px "SF Mono", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(String(data.value2), 40, 340);
+      ctx.fillText(String(data.value2), 30, 450);
       ctx.fillStyle = '#64748b';
-      ctx.font = '18px "SF Mono", monospace';
-      ctx.fillText(`+ ${data.value3 !== undefined ? data.value3 : 0} total`, 40 + String(data.value2).length * 28, 340);
+      ctx.font = '20px "SF Mono", monospace';
+      ctx.fillText('/ ' + (data.value3 !== undefined ? data.value3 : 0) + ' total', 30 + String(data.value2).length * 28, 450);
     }
-
     texture.needsUpdate = true;
-  }, [canvas, texture, color, data, statusColor]);
-
-  useEffect(() => { draw(); }, [draw]);
+  }, [data, statusColor]);
 
   return (
-    <mesh ref={meshRef} position={[0, 0, 0.04]} rotation={[0.3, 0, 0]}>
+    <mesh ref={meshRef}>
       <planeGeometry args={[width, height]} />
       <meshBasicMaterial map={texture} />
     </mesh>

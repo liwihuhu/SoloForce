@@ -1270,6 +1270,98 @@ function TeamMemberNode({ position, member, onClick }: {
 }
 
 // ===========================================
+// 会议桌组件（椭圆形会议桌）
+// ===========================================
+function MeetingTable({ color }: { color: string }) {
+  return (
+    <group>
+      {/* 桌面（椭圆形） */}
+      <mesh position={[0, 0.75, 0]}>
+        <cylinderGeometry args={[2.0, 2.0, 0.06, 32]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.15} metalness={0.85} emissive={color} emissiveIntensity={0.08} />
+      </mesh>
+      {/* 桌面边缘发光条 */}
+      <mesh position={[0, 0.75, 0]}>
+        <torusGeometry args={[1.98, 0.03, 8, 32]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} />
+      </mesh>
+      {/* 桌腿 x4 */}
+      {[[1.6, 0, 1.0], [-1.6, 0, 1.0], [1.6, 0, -1.0], [-1.6, 0, -1.0]].map(([x, , z], i) => (
+        <mesh key={i} position={[x, 0.37, z]}>
+          <cylinderGeometry args={[0.06, 0.06, 0.74, 8]} />
+          <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.9} />
+        </mesh>
+      ))}
+      {/* 桌下横梁连接 */}
+      <mesh position={[0, 0.1, 0]} rotation={[0, 0, 0]}>
+        <boxGeometry args={[3.0, 0.05, 0.05]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.3} metalness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.1, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <boxGeometry args={[2.0, 0.05, 0.05]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.3} metalness={0.8} />
+      </mesh>
+    </group>
+  );
+}
+
+// ===========================================
+// 会议桌座位（每位成员一座：桌面上有名牌+椅子）
+// ===========================================
+function TableSeat({ position, member, onClick }: {
+  position: [number, number, number]; member: any; onClick: (id: string) => void;
+}) {
+  const ec = EMP_TYPE_COLORS[member.type] || '#60A5FA';
+  const statusColor = member.status === 'busy' ? '#F59E0B' : member.status === 'offline' ? '#6B7280' : '#22C55E';
+  const angle = Math.atan2(position[2], position[0]);
+  const facingAngle = angle + Math.PI; // face toward table center
+
+  return (
+    <group position={position}>
+      {/* 椅子底座 */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.45, 20]} />
+        <meshStandardMaterial color={ec} emissive={ec} emissiveIntensity={0.1} transparent opacity={0.4} />
+      </mesh>
+      {/* 椅子腿 */}
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.4, 8]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.9} />
+      </mesh>
+      {/* 椅背 */}
+      <mesh position={[Math.sin(facingAngle) * 0.35, 0.5, Math.cos(facingAngle) * 0.35]} rotation={[0, facingAngle, 0]}>
+        <boxGeometry args={[0.6, 0.5, 0.06]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.8} emissive={ec} emissiveIntensity={0.15} />
+      </mesh>
+      {/* 座位面 */}
+      <mesh position={[0, 0.42, 0]}>
+        <boxGeometry args={[0.5, 0.06, 0.5]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.8} />
+      </mesh>
+      {/* 名牌底座 */}
+      <mesh position={[0, 0.65, 0]} rotation={[-0.2, facingAngle, 0]}>
+        <boxGeometry args={[0.35, 0.25, 0.02]} />
+        <meshStandardMaterial color={ec} emissive={ec} emissiveIntensity={0.6} roughness={0.2} metalness={0.7} />
+      </mesh>
+      {/* 状态灯 */}
+      <mesh position={[0.25, 0.65, 0.1]}>
+        <sphereGeometry args={[0.05, 8, 8]} />
+        <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={3.0} />
+      </mesh>
+      {/* 拾取区域（隐形） */}
+      <mesh
+        position={[0, 0.5, 0]}
+        onClick={(e) => { e.stopPropagation(); onClick(member.id); }}
+        visible={false}
+      >
+        <boxGeometry args={[0.8, 1.0, 0.8]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+    </group>
+  );
+}
+
+// ===========================================
 // 软管连接（从核心到终端，自然下垂弧线）
 // ===========================================
 function SoftTube({ x, z, color }: { x: number; z: number; color: string }) {
@@ -2028,87 +2120,62 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <pointLight position={[7, 0, 1]} intensity={0.5} color={config.glowColor} distance={6} />
         </group>
 
-        {/* ===== 多团队 Hub + 成员辐射布局 ===== */}
+        {/* ===== 多团队围桌布局 ===== */}
         {teamsData.slice(0, 3).map((team, ti) => {
-          const hubX = (ti - 1) * hubSpacing;
+          const tableX = (ti - 1) * hubSpacing;
           const members = team.memberIds
             .map((id: string) => empData.find((e: any) => e.id === id))
             .filter(Boolean);
           const leader = members.find((m: any) => m.type === 'manager') || members[0];
           const memberCount = members.length;
-          const taskCount = Math.floor(Math.random() * 20) + 5; // 模拟
+          const seatRadius = 2.6;
+          const progress = teamProgressMap[team.id]?.progress ?? 0.7;
+          const taskCount = teamProgressMap[team.id]?.taskCount ?? 0;
 
           return (
-            <group key={team.id} position={[hubX, 0, 0]}>
-              {/* HUB GLOW BASE */}
-              <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[1.2, 32]} />
-                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.15} transparent opacity={0.6} />
-              </mesh>
-              {/* SPIN RING */}
-              <mesh position={[0, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[1.2, 0.03, 8, 32]} />
-                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} />
+            <group key={team.id} position={[tableX, 0, 0]}>  
+              {/* 地面团队区域光圈 */}
+              <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[3.5, 32]} />
+                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.08} transparent opacity={0.45} />
               </mesh>
 
-              {/* TEAM NAME PLATE with 3D text */}
-              <group position={[0, 2.0, 0]}>
-                <mesh>
-                  <boxGeometry args={[2.2, 0.6, 0.06]} />
-                  <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} roughness={0.3} metalness={0.5} />
-                </mesh>
-                <Text
-                  position={[0, 0.04, 0.07]}
-                  fontSize={0.26}
-                  color="#ffffff"
-                  anchorX="center"
-                  anchorY="middle"
-                >
+              {/* 会议桌 */}
+              <MeetingTable color={config.glowColor} />
+
+              {/* 桌上方团队名称 */}
+              <group position={[0, 1.88, 0]}>
+                <Text fontSize={0.26} color="#ffffff" anchorX="center" anchorY="middle">
                   {team.name}
                 </Text>
-                <mesh position={[0, 0.1, 0.07]}>
-                  <boxGeometry args={[1.8, 0.06, 0.01]} />
-                  <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
-                </mesh>
                 {leader && (
-                  <Text
-                    position={[0, -0.22, 0.07]}
-                    fontSize={0.12}
-                    color={config.glowColor}
-                    anchorX="center"
-                    anchorY="middle"
-                  >
-                    {leader.name}
+                  <Text position={[0, -0.3, 0]} fontSize={0.12} color={config.glowColor} anchorX="center" anchorY="middle">
+                    {leader.name} · {leader.roleName}
                   </Text>
                 )}
+                <Text position={[0, -0.52, 0]} fontSize={0.1} color={config.glowColor + 'aa'} anchorX="center" anchorY="middle">
+                  {taskCount} TASKS · {Math.round(progress * 100)}% DONE
+                </Text>
               </group>
 
-              {/* PROGRESS RING */}
-              <TeamProgressRing centerX={0} centerY={1.0} progress={teamProgressMap[team.id]?.progress ?? 0.7} color={config.glowColor} taskCount={taskCount} />
-
-              {/* FLOW LINES */}
+              {/* 围桌座位 */}
               {members.slice(0, 6).map((member: any, mi: number) => {
-                const angle = (mi / Math.min(members.length, 6)) * Math.PI * 2 - Math.PI / 2;
-                const mx = Math.cos(angle) * hubRadius;
-                const mz = Math.sin(angle) * hubRadius;
+                const total = Math.min(members.length, 6);
+                const angle = (mi / total) * Math.PI * 2;
+                const sx = Math.cos(angle) * seatRadius;
+                const sz = Math.sin(angle) * seatRadius;
                 return (
-                  <group key={member.id}>
-                    <AnimatedFlowLine
-                      start={[0, 1.0, 0]}
-                      end={[mx, 0.5, mz]}
-                      color={config.glowColor}
-                    />
-                    <TeamMemberNode
-                      position={[mx, 0, mz]}
-                      member={member}
-                      onClick={dispatchEmployeeSelect}
-                    />
-                  </group>
-                )}
-              )}
+                  <TableSeat
+                    key={member.id}
+                    position={[sx, 0, sz]}
+                    member={member}
+                    onClick={dispatchEmployeeSelect}
+                  />
+                );
+              })}
 
-              {/* HUB LIGHT */}
-              <pointLight position={[0, 2, 0]} intensity={0.8} color={config.glowColor} distance={5} />
+              {/* 桌面补光 */}
+              <pointLight position={[0, 2.2, 0]} intensity={1.0} color={config.glowColor} distance={5} />
             </group>
           );
         })}

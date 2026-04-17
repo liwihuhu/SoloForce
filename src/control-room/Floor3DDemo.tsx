@@ -648,6 +648,22 @@ function EntranceWelcomeScreen({ position, color }: { position: [number, number,
 }
 
 // ===========================================
+// 6F Spaceship — Thin connection line from core to station
+function ShipLine({ x, z, color }: { x: number; z: number; color: string }) {
+  const geo = useMemo(() => {
+    const start = new THREE.Vector3(0, 2.8, 0);
+    const end = new THREE.Vector3(x, 1.6, z);
+    const curve = new THREE.LineCurve3(start, end);
+    return new THREE.TubeGeometry(curve, 1, 0.012, 4, false);
+  }, [x, z]);
+  return (
+    <mesh geometry={geo}>
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} transparent opacity={0.35} roughness={0.3} metalness={0.5} />
+    </mesh>
+  );
+}
+
+// ===========================================
 // 6F Neural — Organic curved tube connection
 function OrganicTube({ x, z, color }: { x: number; z: number; color: string }) {
   const geo = useMemo(() => {
@@ -680,7 +696,7 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
     const ctx = canvas.getContext('2d')!;
     const W = 1024, H = 512;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#000c1a';
+    ctx.fillStyle = '#060c18';
     ctx.fillRect(0, 0, W, H);
     const d = ocStatus || {};
     const gw = d.gateway || {};
@@ -688,63 +704,76 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
     const mem = d.memory || {};
     const ts = d.tasks || {};
     const ss = d.sessions || {};
-    // Header
-    ctx.fillStyle = color;
+    // Header — clean cold blue bar
+    ctx.fillStyle = '#1a2a4a';
     ctx.fillRect(0, 0, W, 60);
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 26px "SF Mono", monospace';
+    ctx.fillStyle = '#e8f0ff';
+    ctx.font = 'bold 22px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('OPENCLAW SYSTEM STATUS', W / 2, 40);
-    // Gateway circle (top right)
+    ctx.fillText('OPENCLAW  SYSTEM  STATUS', W / 2, 40);
+    // Gateway status circle (top right)
     const gColor = gw.reachable ? '#22C55E' : '#EF4444';
     ctx.fillStyle = gColor;
     ctx.beginPath();
-    ctx.arc(W - 100, 100, 44, 0, Math.PI * 2);
+    ctx.arc(W - 90, 100, 40, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 14px "SF Mono", monospace';
+    ctx.fillStyle = gColor === '#22C55E' ? '#000' : '#fff';
+    ctx.font = 'bold 12px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(gw.reachable ? 'ONLINE' : 'OFFLINE', W - 100, 96);
-    ctx.fillText(gw.latency ? gw.latency + 'ms' : '0ms', W - 100, 114);
-    // 4 KPI cards
-    const cardW = 215, cardH = 160, gap = 20;
+    ctx.fillText(gw.reachable ? 'ONLINE' : 'OFFLINE', W - 90, 96);
+    ctx.fillText(gw.latency ? gw.latency + 'ms' : '0ms', W - 90, 112);
+    // Latency number large
+    ctx.fillStyle = '#c0d0f0';
+    ctx.font = 'bold 32px "SF Mono", monospace';
+    ctx.fillText(gw.latency ? gw.latency + 'ms' : '--', W - 90, 148);
+    ctx.font = '11px "SF Mono", monospace';
+    ctx.fillText('GATEWAY', W - 90, 166);
+    // 4 KPI cards — cold blue theme
+    const cardW = 215, cardH = 155, gap = 20;
     const cards = [
-      { label: 'AGENTS', value: ag.count || 0, sub: (ag.sessions || 0) + ' sessions', color: '#F472B6' },
-      { label: 'ACTIVE', value: ts.active || 0, sub: 'queued ' + (ts.queued || 0) + ' | running ' + (ts.running || 0), color: '#60A5FA' },
+      { label: 'AGENTS', value: ag.count || 0, sub: (ag.sessions || 0) + ' sessions', color: '#E879F9' },
+      { label: 'TASKS', value: ts.active || 0, sub: 'r ' + (ts.running || 0) + ' | q ' + (ts.queued || 0), color: '#60A5FA' },
       { label: 'MEMORY', value: mem.files || 0, sub: (mem.chunks || 0) + ' chunks', color: '#4ADE80' },
       { label: 'SESSIONS', value: ss.active || 0, sub: (ts.tracked || 0) + ' tracked', color: '#A78BFA' },
     ];
-    const startX = 40;
+    const startX = 38;
     cards.forEach((card, i) => {
       const x = startX + i * (cardW + gap);
-      const y = 85;
-      ctx.fillStyle = '#0a1828';
+      const y = 82;
+      // Card bg — clean dark
+      ctx.fillStyle = '#0a1428';
       ctx.strokeStyle = card.color;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(x, y, cardW, cardH, 8);
+      ctx.roundRect(x, y, cardW, cardH, 6);
       ctx.fill();
       ctx.stroke();
+      // Top color strip
       ctx.fillStyle = card.color;
-      ctx.fillRect(x + 4, y + 4, cardW - 8, 5);
+      ctx.fillRect(x + 3, y + 3, cardW - 6, 4);
+      // Label
       ctx.fillStyle = card.color;
-      ctx.font = 'bold 13px "SF Mono", monospace';
+      ctx.font = 'bold 11px "SF Mono", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(card.label, x + 14, y + 32);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 58px "SF Mono", monospace';
-      ctx.fillText(String(card.value), x + 14, y + 112);
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px "SF Mono", monospace';
-      ctx.fillText(card.sub, x + 14, y + 140);
+      ctx.fillText(card.label, x + 12, y + 28);
+      // Big value
+      ctx.fillStyle = '#f0f4ff';
+      ctx.font = 'bold 56px "SF Mono", monospace';
+      ctx.fillText(String(card.value), x + 12, y + 100);
+      // Sub text
+      ctx.fillStyle = '#7090b0';
+      ctx.font = '11px "SF Mono", monospace';
+      ctx.fillText(card.sub, x + 12, y + 128);
     });
-    // System bar
+    // Bottom status bar — clean green
+    ctx.fillStyle = '#0a2018';
+    ctx.fillRect(0, H - 40, W, 40);
     ctx.fillStyle = '#22C55E';
-    ctx.fillRect(0, H - 44, W, 44);
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 15px "SF Mono", monospace';
+    ctx.fillRect(0, H - 40, 6, 40);
+    ctx.fillStyle = '#a0d0b0';
+    ctx.font = 'bold 13px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('ALL SYSTEMS OPERATIONAL  |  5s REFRESH', W / 2, H - 16);
+    ctx.fillText('SYSTEMS  NOMINAL  |  5s  REFRESH', W / 2, H - 16);
     texture.needsUpdate = true;
   }, [ocStatus]);
 
@@ -2326,10 +2355,11 @@ function Floor3DScene({ floorId }: { floorId: string }) {
   
   
   
+  
   if (floorId === '6f') {
     // ================================================================
-    // 6F NEURAL COMMAND CENTER — Organic + Readable Hybrid
-    // Semi-abstract: organic core, concrete terminal stations, clear data
+    // 6F SPACESHIP COMMAND DECK — 静谧星舰 · Elegant Sci-Fi
+    // White/silver minimal + cold blue accents · Apple × Interstellar
     // ================================================================
 
     const [ocStatus, setOcStatus] = useState<any>(null);
@@ -2369,211 +2399,200 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       LOADED: '#22C55E', READY: '#22C55E',
     };
 
-    // Core breathing animation
+    // Core slow spin + breathing
     const coreRef = useRef<THREE.Mesh>(null!);
+    const coreRingRef = useRef<THREE.Group>(null!);
     useFrame(({ clock }) => {
       if (!coreRef.current) return;
       const t = clock.getElapsedTime();
-      const b = Math.sin(t * 1.2) * 0.05 + 1.0;
+      coreRef.current.rotation.y = t * 0.25;
+      const b = Math.sin(t * 0.9) * 0.04 + 1.0;
       coreRef.current.scale.setScalar(b);
+      if (coreRingRef.current) coreRingRef.current.rotation.z = t * 0.15;
     });
 
-    // Node gentle float
-    const nodeRefs = useRef<(THREE.Group | null)[]>([]);
+    // Station float
+    const stationRefs = useRef<(THREE.Group | null)[]>([]);
     useFrame(({ clock }) => {
       const t = clock.getElapsedTime();
-      nodeRefs.current.forEach((ref, i) => {
+      stationRefs.current.forEach((ref, i) => {
         if (!ref) return;
-        ref.position.y = Math.sin(t * 0.6 + i * 0.7) * 0.12;
+        ref.position.y = Math.sin(t * 0.5 + i * 0.8) * 0.08;
       });
     });
 
-    // 8 terminals in a ring, front row closer (readability)
-    const terminals = [
+    // Station layout: ME front-center, others in wide arc
+    const stations = [
       { x:  0,    z: -5.2, color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
-      { x: -4.4,  z: -2.8, color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
-      { x:  4.4,  z: -2.8, color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
-      { x: -5.2,  z:  0,   color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY',   isMe: false },
-      { x:  5.2,  z:  0,   color: '#38BDF8', label: 'SESSIONS', key: 'SESSIONS', isMe: false },
-      { x: -3.2,  z:  3.8, color: '#60A5FA', label: 'TASKS',    key: 'TASKS',    isMe: false },
-      { x:  3.2,  z:  3.8, color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS',   isMe: false },
+      { x: -4.8,  z: -2.6, color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
+      { x:  4.8,  z: -2.6, color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
+      { x: -6.2,  z:  0.5, color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY',   isMe: false },
+      { x:  6.2,  z:  0.5, color: '#38BDF8', label: 'SESSIONS', key: 'SESSIONS', isMe: false },
+      { x: -4.2,  z:  3.8, color: '#60A5FA', label: 'TASKS',    key: 'TASKS',    isMe: false },
+      { x:  4.2,  z:  3.8, color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS',   isMe: false },
       { x:  0,    z:  5.2, color: '#FB923C', label: 'MCP',      key: 'MCP',      isMe: false },
     ];
 
     return (
       <group position={[0, -floorIndex * FLOOR_HEIGHT, 0]}>
 
-        {/* ===== Floor ===== */}
+        {/* ===== Floor: clean white/silver deck ===== */}
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[20, 16]} />
-          <meshStandardMaterial color="#060e1a" roughness={0.2} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.05} />
+          <planeGeometry args={[22, 18]} />
+          <meshStandardMaterial
+            color="#e8eef4"
+            roughness={0.15}
+            metalness={0.6}
+            emissive="#b8c8e0"
+            emissiveIntensity={0.04}
+          />
         </mesh>
-        <gridHelper args={[20, 40, '#0d2040', '#0d2040']} position={[0, 0.005, 0]} opacity={0.3} transparent />
+        {/* Subtle grid */}
+        <gridHelper args={[22, 44, '#c0d0e0', '#c8d8e8']} position={[0, 0.003, 0]} opacity={0.25} transparent />
 
-        {/* Raised circular platform under core */}
-        <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[2.8, 48]} />
-          <meshStandardMaterial color="#0a1830" roughness={0.2} metalness={0.8} emissive={config.glowColor} emissiveIntensity={0.08} />
+        {/* Circular core platform (white marble) */}
+        <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[2.6, 48]} />
+          <meshStandardMaterial color="#f0f4f8" roughness={0.1} metalness={0.7} emissive="#d0e0f0" emissiveIntensity={0.05} />
         </mesh>
-        <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[2.6, 2.9, 48]} />
-          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} />
+        <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[2.4, 2.65, 48]} />
+          <meshStandardMaterial color="#a0b8d0" emissive="#6080a0" emissiveIntensity={0.6} />
         </mesh>
 
         {/* ===== Lights ===== */}
-        <pointLight position={[0, 5, 0]} intensity={2.5} color={config.glowColor} distance={20} />
-        <pointLight position={[0, 3, 0]} intensity={4.0} color={'#F472B6'} distance={14} />
-        <pointLight position={[-6, 2, 4]} intensity={1.2} color={'#60A5FA'} distance={12} />
-        <pointLight position={[6, 2, -4]} intensity={1.2} color={'#A78BFA'} distance={12} />
+        <ambientLight intensity={1.2} color="#e8f0ff" />
+        <directionalLight position={[0, 8, 0]} intensity={1.8} color="#ffffff" />
+        <pointLight position={[0, 4, 0]} intensity={3.0} color="#c0d8ff" distance={20} />
+        <pointLight position={[0, 3, 0]} intensity={4.0} color="#6080c0" distance={12} />
+        <pointLight position={[-8, 2, 4]} intensity={0.8} color="#80a0d0" distance={14} />
+        <pointLight position={[8, 2, -4]} intensity={0.8} color="#80a0d0" distance={14} />
 
-        {/* ===== Organic Brain Core ===== */}
-        <group position={[0, 2.5, 0]}>
-          {/* Core sphere */}
+        {/* ===== Core: Suspended white sphere + cold blue rings ===== */}
+        <group position={[0, 2.8, 0]}>
+          {/* Outer halo ring — horizontal */}
+          <mesh ref={coreRingRef} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[2.0, 0.028, 8, 80]} />
+            <meshStandardMaterial color="#6090c0" emissive="#4060a0" emissiveIntensity={1.2} transparent opacity={0.7} />
+          </mesh>
+          {/* Tilted ring */}
+          <mesh rotation={[Math.PI / 3, 0.3, 0]}>
+            <torusGeometry args={[2.0, 0.022, 8, 80]} />
+            <meshStandardMaterial color="#8090c0" emissive="#5070a0" emissiveIntensity={1.0} transparent opacity={0.5} />
+          </mesh>
+          {/* Second tilted ring */}
+          <mesh rotation={[Math.PI / 6, -0.5, 0]}>
+            <torusGeometry args={[1.6, 0.018, 8, 64]} />
+            <meshStandardMaterial color="#a0b0d0" emissive="#7090b0" emissiveIntensity={0.8} transparent opacity={0.4} />
+          </mesh>
+
+          {/* Main white sphere */}
           <mesh ref={coreRef}>
-            <sphereGeometry args={[1.1, 32, 32]} />
-            <meshStandardMaterial color="#000d20" roughness={0.05} metalness={0.98} emissive={config.glowColor} emissiveIntensity={0.4} />
+            <sphereGeometry args={[1.0, 48, 48]} />
+            <meshStandardMaterial color="#f5f8fc" roughness={0.05} metalness={0.85} emissive="#c0d0f0" emissiveIntensity={0.3} />
           </mesh>
-          {/* Inner glow */}
+          {/* Inner cold glow */}
           <mesh>
-            <sphereGeometry args={[0.5, 16, 16]} />
-            <meshStandardMaterial color="#001840" roughness={0.0} metalness={1.0} emissive={config.glowColor} emissiveIntensity={3.0} />
-          </mesh>
-          {/* 3 orbit rings */}
-          {[0, Math.PI / 3, Math.PI / 3 * 2].map((rot, i) => (
-            <mesh key={i} rotation={[rot, 0, 0]}>
-              <torusGeometry args={[1.6, 0.028, 8, 64]} />
-              <meshStandardMaterial color={i === 0 ? config.glowColor : i === 1 ? '#A78BFA' : '#60A5FA'} emissive={i === 0 ? config.glowColor : i === 1 ? '#A78BFA' : '#60A5FA'} emissiveIntensity={1.5} transparent opacity={0.7} />
-            </mesh>
-          ))}
-          {/* Top ring halo */}
-          <mesh position={[0, 1.8, 0]}>
-            <torusGeometry args={[0.6, 0.04, 8, 32]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={3.0} />
-          </mesh>
-          {/* Bottom halo */}
-          <mesh position={[0, -1.8, 0]}>
-            <torusGeometry args={[0.6, 0.04, 8, 32]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
+            <sphereGeometry args={[0.5, 24, 24]} />
+            <meshStandardMaterial color="#80a0d0" roughness={0.0} metalness={1.0} emissive="#6080c0" emissiveIntensity={2.0} transparent opacity={0.8} />
           </mesh>
           {/* Central light */}
-          <pointLight intensity={6.0} color={config.glowColor} distance={16} />
+          <pointLight intensity={5.0} color="#6080c0" distance={16} />
         </group>
 
-        {/* ===== Central Dashboard Screen ===== */}
-        <group position={[0, 1.5, 3.2]} rotation={[-0.2, 0, 0]}>
-          {/* Frame */}
-          <mesh position={[0, 0, -0.06]}>
-            <boxGeometry args={[5.0, 3.0, 0.1]} />
-            <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.1} />
+        {/* ===== Central Dashboard Screen (front, clean frame) ===== */}
+        <group position={[0, 1.6, 3.5]} rotation={[-0.15, 0, 0]}>
+          {/* Clean white frame */}
+          <mesh position={[0, 0, -0.08]}>
+            <boxGeometry args={[5.6, 3.2, 0.1]} />
+            <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.85} emissive="#d0e0f0" emissiveIntensity={0.08} />
           </mesh>
-          {/* Screen */}
+          {/* Inner dark panel */}
           <mesh>
-            <boxGeometry args={[4.7, 2.7, 0.04]} />
-            <meshStandardMaterial color="#000810" roughness={0.05} metalness={0.2} emissive={config.glowColor} emissiveIntensity={0.08} />
+            <boxGeometry args={[5.2, 2.8, 0.05]} />
+            <meshStandardMaterial color="#080e18" roughness={0.05} metalness={0.3} emissive="#2040a0" emissiveIntensity={0.05} />
           </mesh>
-          <CoreStatsScreen width={4.4} height={2.4} color={config.glowColor} ocStatus={ocStatus} />
-          {/* Top bar */}
-          <mesh position={[0, 1.4, 0.04]}>
-            <boxGeometry args={[4.4, 0.1, 0.02]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={3.0} />
-          </mesh>
-          {/* Bottom bar */}
-          <mesh position={[0, -1.4, 0.04]}>
-            <boxGeometry args={[4.4, 0.1, 0.02]} />
-            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.5} />
-          </mesh>
-          {/* Side accent bars */}
-          <mesh position={[-2.35, 0, 0.04]}>
-            <boxGeometry args={[0.06, 2.8, 0.02]} />
-            <meshStandardMaterial color="#F472B6" emissive="#F472B6" emissiveIntensity={2.0} />
-          </mesh>
-          <mesh position={[2.35, 0, 0.04]}>
-            <boxGeometry args={[0.06, 2.8, 0.02]} />
-            <meshStandardMaterial color="#A78BFA" emissive="#A78BFA" emissiveIntensity={2.0} />
+          <CoreStatsScreen width={4.8} height={2.5} color="#8090c0" ocStatus={ocStatus} />
+          {/* Bottom clean bar */}
+          <mesh position={[0, -1.5, 0.06]}>
+            <boxGeometry args={[4.8, 0.08, 0.02]} />
+            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.0} />
           </mesh>
         </group>
 
-        {/* ===== Organic Connection Tubes (curved) ===== */}
-        {terminals.map(({ x, z, color }, i) => (
-          <OrganicTube key={i} x={x} z={z} color={color} />
+        {/* ===== Thin Connection Lines ===== */}
+        {stations.map(({ x, z, color }, i) => (
+          <ShipLine key={i} x={x} z={z} color={color} />
         ))}
 
-        {/* ===== 8 Terminal Stations ===== */}
-        {terminals.map(({ x, z, color, label, key, isMe }, i) => {
+        {/* ===== 8 Station Pods ===== */}
+        {stations.map(({ x, z, color, label, key, isMe }, i) => {
           const data = terminalData?.[key];
           const sc = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
+          const screenRy = Math.atan2(x, z) + Math.PI;
+
           return (
             <group key={label} position={[x, 0, z]}>
-              {/* Hexagonal floor pad */}
-              <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[1.1, 6]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} roughness={0.3} metalness={0.7} />
+              {/* Clean circular platform */}
+              <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[1.2, 32]} />
+                <meshStandardMaterial color="#e8eef4" roughness={0.12} metalness={0.75} emissive={color} emissiveIntensity={0.04} />
               </mesh>
-              {/* Outer ring */}
-              <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.9, 1.15, 6]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} side={THREE.DoubleSide} />
-              </mesh>
-
-              {/* Pillar */}
-              <mesh position={[0, 0.85, 0]}>
-                <cylinderGeometry args={[0.22, 0.28, 1.6, 10]} />
-                <meshStandardMaterial color="#0a1828" roughness={0.2} metalness={0.9} emissive={color} emissiveIntensity={0.1} />
-              </mesh>
-              {/* Mid ring */}
-              <mesh position={[0, 0.85, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.26, 0.045, 8, 24]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} />
+              {/* Ring on platform */}
+              <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.9, 1.1, 32]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} side={THREE.DoubleSide} />
               </mesh>
 
-              {/* Status orb at top */}
-              <mesh position={[0, 1.8, 0]}>
-                <sphereGeometry args={[0.18, 12, 12]} />
-                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={3.0} />
+              {/* Thin pedestal */}
+              <mesh position={[0, 0.65, 0]}>
+                <cylinderGeometry args={[0.08, 0.1, 1.2, 12]} />
+                <meshStandardMaterial color="#d0d8e4" roughness={0.15} metalness={0.9} />
               </mesh>
-              <pointLight position={[0, 1.8, 0]} intensity={1.5} color={sc} distance={5} />
 
-              {/* Info screen — faces toward center */}
+              {/* Status orb */}
+              <mesh position={[0, 1.5, 0]}>
+                <sphereGeometry args={[0.12, 12, 12]} />
+                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.5} />
+              </mesh>
+              <pointLight position={[0, 1.5, 0]} intensity={1.0} color={sc} distance={4} />
+
+              {/* Floating screen group */}
               <group
-                ref={el => { nodeRefs.current[i] = el as any; }}
-                position={[0, 1.85, 0]}
-                rotation={[0, Math.atan2(x, z) + Math.PI, 0]}
+                ref={el => { stationRefs.current[i] = el as any; }}
+                position={[0, 1.6, 0]}
+                rotation={[0, screenRy, 0]}
               >
-                {/* Screen frame */}
+                {/* Clean white frame */}
                 <mesh position={[0, 0, -0.04]}>
-                  <boxGeometry args={[isMe ? 2.4 : 2.0, isMe ? 1.8 : 1.4, 0.07]} />
-                  <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.15} />
+                  <boxGeometry args={[isMe ? 2.6 : 2.1, isMe ? 1.9 : 1.5, 0.06]} />
+                  <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.88} emissive={color} emissiveIntensity={0.1} />
                 </mesh>
-                {/* Screen inner */}
+                {/* Dark screen */}
                 <mesh position={[0, 0, 0]}>
-                  <boxGeometry args={[isMe ? 2.2 : 1.8, isMe ? 1.6 : 1.2, 0.03]} />
-                  <meshStandardMaterial color="#000810" roughness={0.05} metalness={0.2} />
+                  <boxGeometry args={[isMe ? 2.4 : 1.9, isMe ? 1.7 : 1.3, 0.03]} />
+                  <meshStandardMaterial color="#08101e" roughness={0.05} metalness={0.3} />
                 </mesh>
                 <TerminalScreen
-                  width={isMe ? 2.0 : 1.6}
-                  height={isMe ? 1.4 : 1.0}
+                  width={isMe ? 2.2 : 1.7}
+                  height={isMe ? 1.5 : 1.1}
                   color={color}
                   data={data}
                   statusColor={sc}
                   variant={isMe ? 'me' : undefined}
                 />
-                {/* Top bar */}
-                <mesh position={[0, isMe ? 0.75 : 0.65, 0.04]}>
-                  <boxGeometry args={[isMe ? 2.0 : 1.6, 0.1, 0.02]} />
-                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={3.0} />
-                </mesh>
-                {/* Bottom bar */}
-                <mesh position={[0, isMe ? -0.75 : -0.65, 0.04]}>
-                  <boxGeometry args={[isMe ? 2.0 : 1.6, 0.08, 0.02]} />
+                {/* Bottom accent */}
+                <mesh position={[0, isMe ? -0.9 : -0.75, 0.04]}>
+                  <boxGeometry args={[isMe ? 2.2 : 1.7, 0.07, 0.02]} />
                   <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.0} />
                 </mesh>
               </group>
 
-              {/* Label below */}
-              <Text position={[0, -0.12, 0.7]} fontSize={0.2} color={color} anchorX="center" anchorY="middle">
+              {/* Station label */}
+              <Text position={[0, -0.1, 0.85]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
                 {label}
               </Text>
-              <Text position={[0, -0.12 + 0.28, 0.7]} fontSize={0.11} color={color} anchorX="center" anchorY="middle" fillOpacity={0.55}>
+              <Text position={[0, -0.1 + 0.28, 0.85]} fontSize={0.1} color={color} anchorX="center" anchorY="middle" fillOpacity={0.5}>
                 {data ? String(data.value1) : '--'} {data?.unit || ''}
               </Text>
             </group>

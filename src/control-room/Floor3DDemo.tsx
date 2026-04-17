@@ -2356,10 +2356,11 @@ function Floor3DScene({ floorId }: { floorId: string }) {
   
   
   
+  
   if (floorId === '6f') {
     // ================================================================
-    // 6F SPACESHIP COMMAND DECK — 静谧星舰 · Elegant Sci-Fi
-    // White/silver minimal + cold blue accents · Apple × Interstellar
+    // 6F SPACESHIP COMMAND — 静谧星舰 · Elegant Sci-Fi
+    // Clean: fixed screen direction, no duplicate layers
     // ================================================================
 
     const [ocStatus, setOcStatus] = useState<any>(null);
@@ -2399,29 +2400,28 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       LOADED: '#22C55E', READY: '#22C55E',
     };
 
-    // Core slow spin + breathing
+    // Core breathing + ring spin
     const coreRef = useRef<THREE.Mesh>(null!);
-    const coreRingRef = useRef<THREE.Group>(null!);
+    const ringRef = useRef<THREE.Group>(null!);
     useFrame(({ clock }) => {
       if (!coreRef.current) return;
       const t = clock.getElapsedTime();
-      coreRef.current.rotation.y = t * 0.25;
       const b = Math.sin(t * 0.9) * 0.04 + 1.0;
       coreRef.current.scale.setScalar(b);
-      if (coreRingRef.current) coreRingRef.current.rotation.z = t * 0.15;
+      if (ringRef.current) ringRef.current.rotation.z = t * 0.12;
     });
 
-    // Station float
+    // Station gentle float
     const stationRefs = useRef<(THREE.Group | null)[]>([]);
     useFrame(({ clock }) => {
       const t = clock.getElapsedTime();
       stationRefs.current.forEach((ref, i) => {
         if (!ref) return;
-        ref.position.y = Math.sin(t * 0.5 + i * 0.8) * 0.08;
+        ref.position.y = Math.sin(t * 0.5 + i * 0.75) * 0.07;
       });
     });
 
-    // Station layout: ME front-center, others in wide arc
+    // 8 stations: arc layout, ME front-center
     const stations = [
       { x:  0,    z: -5.2, color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
       { x: -4.8,  z: -2.6, color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
@@ -2436,163 +2436,172 @@ function Floor3DScene({ floorId }: { floorId: string }) {
     return (
       <group position={[0, -floorIndex * FLOOR_HEIGHT, 0]}>
 
-        {/* ===== Floor: clean white/silver deck ===== */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        {/* ======= FLOOR (single, clean) ======= */}
+        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[22, 18]} />
-          <meshStandardMaterial
-            color="#e8eef4"
-            roughness={0.15}
-            metalness={0.6}
-            emissive="#b8c8e0"
-            emissiveIntensity={0.04}
-          />
+          <meshStandardMaterial color="#e8eef4" roughness={0.15} metalness={0.55} emissive="#c0d0e8" emissiveIntensity={0.04} />
         </mesh>
-        {/* Subtle grid */}
-        <gridHelper args={[22, 44, '#c0d0e0', '#c8d8e8']} position={[0, 0.003, 0]} opacity={0.25} transparent />
+        <gridHelper args={[22, 44, '#c8d8e8', '#d0dce8']} position={[0, 0.003, 0]} opacity={0.22} transparent />
 
-        {/* Circular core platform (white marble) */}
+        {/* ======= CORE PLATFORM (single circular base) ======= */}
         <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[2.6, 48]} />
-          <meshStandardMaterial color="#f0f4f8" roughness={0.1} metalness={0.7} emissive="#d0e0f0" emissiveIntensity={0.05} />
+          <meshStandardMaterial color="#f0f4f8" roughness={0.1} metalness={0.7} emissive="#d0e0f0" emissiveIntensity={0.04} />
         </mesh>
-        <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[2.4, 2.65, 48]} />
-          <meshStandardMaterial color="#a0b8d0" emissive="#6080a0" emissiveIntensity={0.6} />
+        <mesh position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[2.45, 2.62, 48]} />
+          <meshStandardMaterial color="#7090b0" emissive="#4060a0" emissiveIntensity={0.8} side={THREE.DoubleSide} />
         </mesh>
 
-        {/* ===== Lights ===== */}
-        <ambientLight intensity={1.2} color="#e8f0ff" />
-        <directionalLight position={[0, 8, 0]} intensity={1.8} color="#ffffff" />
-        <pointLight position={[0, 4, 0]} intensity={3.0} color="#c0d8ff" distance={20} />
-        <pointLight position={[0, 3, 0]} intensity={4.0} color="#6080c0" distance={12} />
+        {/* ======= LIGHTING ======= */}
+        <ambientLight intensity={1.0} color="#e0eaff" />
+        <directionalLight position={[0, 10, 0]} intensity={1.5} color="#ffffff" />
+        <pointLight position={[0, 4, 0]} intensity={3.0} color="#7090c0" distance={20} />
+        <pointLight position={[0, 3, 0]} intensity={4.5} color="#6080c0" distance={14} />
         <pointLight position={[-8, 2, 4]} intensity={0.8} color="#80a0d0" distance={14} />
         <pointLight position={[8, 2, -4]} intensity={0.8} color="#80a0d0" distance={14} />
 
-        {/* ===== Core: Suspended white sphere + cold blue rings ===== */}
+        {/* ======= CORE: White sphere + spinning rings ======= */}
         <group position={[0, 2.8, 0]}>
-          {/* Outer halo ring — horizontal */}
-          <mesh ref={coreRingRef} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[2.0, 0.028, 8, 80]} />
-            <meshStandardMaterial color="#6090c0" emissive="#4060a0" emissiveIntensity={1.2} transparent opacity={0.7} />
+          {/* Spinning ring group */}
+          <group ref={ringRef}>
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[2.0, 0.025, 8, 80]} />
+              <meshStandardMaterial color="#6090c0" emissive="#4060a0" emissiveIntensity={1.0} transparent opacity={0.7} />
+            </mesh>
+            <mesh rotation={[Math.PI / 3, 0.3, 0]}>
+              <torusGeometry args={[2.0, 0.02, 8, 80]} />
+              <meshStandardMaterial color="#8090c0" emissive="#5070a0" emissiveIntensity={0.8} transparent opacity={0.5} />
+            </mesh>
           </mesh>
-          {/* Tilted ring */}
-          <mesh rotation={[Math.PI / 3, 0.3, 0]}>
-            <torusGeometry args={[2.0, 0.022, 8, 80]} />
-            <meshStandardMaterial color="#8090c0" emissive="#5070a0" emissiveIntensity={1.0} transparent opacity={0.5} />
-          </mesh>
-          {/* Second tilted ring */}
-          <mesh rotation={[Math.PI / 6, -0.5, 0]}>
-            <torusGeometry args={[1.6, 0.018, 8, 64]} />
-            <meshStandardMaterial color="#a0b0d0" emissive="#7090b0" emissiveIntensity={0.8} transparent opacity={0.4} />
-          </mesh>
-
-          {/* Main white sphere */}
+          {/* Main white sphere (breathing) */}
           <mesh ref={coreRef}>
             <sphereGeometry args={[1.0, 48, 48]} />
-            <meshStandardMaterial color="#f5f8fc" roughness={0.05} metalness={0.85} emissive="#c0d0f0" emissiveIntensity={0.3} />
+            <meshStandardMaterial color="#f5f8fc" roughness={0.05} metalness={0.88} emissive="#c0d0f0" emissiveIntensity={0.28} />
           </mesh>
-          {/* Inner cold glow */}
+          {/* Inner glow core */}
           <mesh>
             <sphereGeometry args={[0.5, 24, 24]} />
-            <meshStandardMaterial color="#80a0d0" roughness={0.0} metalness={1.0} emissive="#6080c0" emissiveIntensity={2.0} transparent opacity={0.8} />
+            <meshStandardMaterial color="#7090c0" roughness={0.0} metalness={1.0} emissive="#5070b0" emissiveIntensity={2.5} transparent opacity={0.75} />
           </mesh>
-          {/* Central light */}
-          <pointLight intensity={5.0} color="#6080c0" distance={16} />
+          <pointLight intensity={5.5} color="#5070b0" distance={16} />
         </group>
 
-        {/* ===== Central Dashboard Screen (front, clean frame) ===== */}
-        <group position={[0, 1.6, 3.5]} rotation={[-0.15, 0, 0]}>
-          {/* Clean white frame */}
-          <mesh position={[0, 0, -0.08]}>
+        {/* ======= CENTRAL DASHBOARD SCREEN ======= */}
+        <group position={[0, 1.6, 3.6]} rotation={[-0.15, 0, 0]}>
+          {/* White outer frame */}
+          <mesh position={[0, 0, -0.06]}>
             <boxGeometry args={[5.6, 3.2, 0.1]} />
-            <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.85} emissive="#d0e0f0" emissiveIntensity={0.08} />
+            <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.85} emissive="#d0e0f0" emissiveIntensity={0.06} />
           </mesh>
-          {/* Inner dark panel */}
-          <mesh>
-            <boxGeometry args={[5.2, 2.8, 0.05]} />
-            <meshStandardMaterial color="#080e18" roughness={0.05} metalness={0.3} emissive="#2040a0" emissiveIntensity={0.05} />
+          {/* Dark inner panel */}
+          <mesh position={[0, 0, 0]}>
+            <boxGeometry args={[5.25, 2.85, 0.04]} />
+            <meshStandardMaterial color="#080e18" roughness={0.05} metalness={0.3} />
           </mesh>
-          <CoreStatsScreen width={4.8} height={2.5} color="#8090c0" ocStatus={ocStatus} />
-          {/* Bottom clean bar */}
-          <mesh position={[0, -1.5, 0.06]}>
-            <boxGeometry args={[4.8, 0.08, 0.02]} />
+          {/* Canvas content */}
+          <mesh position={[0, 0, 0.005]}>
+            <planeGeometry args={[4.9, 2.55]} />
+            <meshBasicMaterial map={undefined} />
+          </mesh>
+          <CoreStatsScreen width={4.9} height={2.55} color="#8090c0" ocStatus={ocStatus} />
+          {/* Bottom status bar */}
+          <mesh position={[0, -1.52, 0.06]}>
+            <boxGeometry args={[4.9, 0.08, 0.02]} />
             <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.0} />
           </mesh>
         </group>
 
-        {/* ===== Thin Connection Lines ===== */}
+        {/* ======= CONNECTION LINES (thin, clean) ======= */}
         {stations.map(({ x, z, color }, i) => (
-          <ShipLine key={i} x={x} z={z} color={color} />
+          <mesh key={i} position={[[0, 2.8, 0], [x, 1.7, z]] as any}>
+            <line>
+              <bufferGeometry>
+                <bufferAttribute
+                  attach="attributes-position"
+                  array={new Float32Array([0, 2.8, 0, x, 1.7, z])}
+                  count={2}
+                  itemSize={3}
+                />
+              </bufferGeometry>
+              <lineBasicMaterial color={color} transparent opacity={0.4} linewidth={1} />
+            </line>
+          </mesh>
         ))}
 
-        {/* ===== 8 Station Pods ===== */}
+        {/* ======= 8 TERMINAL STATIONS ======= */}
         {stations.map(({ x, z, color, label, key, isMe }, i) => {
           const data = terminalData?.[key];
           const sc = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
-          const screenRy = Math.atan2(x, z) + Math.PI;
 
           return (
             <group key={label} position={[x, 0, z]}>
-              {/* Clean circular platform */}
+
+              {/* Circular platform */}
               <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[1.2, 32]} />
-                <meshStandardMaterial color="#e8eef4" roughness={0.12} metalness={0.75} emissive={color} emissiveIntensity={0.04} />
+                <circleGeometry args={[1.1, 32]} />
+                <meshStandardMaterial color="#e8eef4" roughness={0.12} metalness={0.75} emissive={color} emissiveIntensity={0.05} />
               </mesh>
-              {/* Ring on platform */}
-              <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.9, 1.1, 32]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} side={THREE.DoubleSide} />
+              {/* Ring accent */}
+              <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.85, 1.08, 32]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} side={THREE.DoubleSide} />
               </mesh>
 
               {/* Thin pedestal */}
               <mesh position={[0, 0.65, 0]}>
-                <cylinderGeometry args={[0.08, 0.1, 1.2, 12]} />
+                <cylinderGeometry args={[0.07, 0.09, 1.2, 10]} />
                 <meshStandardMaterial color="#d0d8e4" roughness={0.15} metalness={0.9} />
               </mesh>
 
               {/* Status orb */}
               <mesh position={[0, 1.5, 0]}>
-                <sphereGeometry args={[0.12, 12, 12]} />
-                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.5} />
+                <sphereGeometry args={[0.11, 10, 10]} />
+                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={3.0} />
               </mesh>
               <pointLight position={[0, 1.5, 0]} intensity={1.0} color={sc} distance={4} />
 
-              {/* Floating screen group */}
+              {/* Screen — faces TOWARD center (removed +PI bug) */}
               <group
                 ref={el => { stationRefs.current[i] = el as any; }}
                 position={[0, 1.6, 0]}
-                rotation={[0, screenRy, 0]}
+                rotation={[0, Math.atan2(x, z), 0]}
               >
-                {/* Clean white frame */}
+                {/* Frame */}
                 <mesh position={[0, 0, -0.04]}>
-                  <boxGeometry args={[isMe ? 2.6 : 2.1, isMe ? 1.9 : 1.5, 0.06]} />
-                  <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.88} emissive={color} emissiveIntensity={0.1} />
+                  <boxGeometry args={[isMe ? 2.6 : 2.0, isMe ? 1.9 : 1.4, 0.06]} />
+                  <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.88} emissive={color} emissiveIntensity={0.08} />
                 </mesh>
-                {/* Dark screen */}
+                {/* Dark inner */}
                 <mesh position={[0, 0, 0]}>
-                  <boxGeometry args={[isMe ? 2.4 : 1.9, isMe ? 1.7 : 1.3, 0.03]} />
+                  <boxGeometry args={[isMe ? 2.4 : 1.8, isMe ? 1.7 : 1.2, 0.03]} />
                   <meshStandardMaterial color="#08101e" roughness={0.05} metalness={0.3} />
                 </mesh>
+                {/* Canvas screen (front) */}
+                <mesh position={[0, 0, 0.01]}>
+                  <planeGeometry args={[isMe ? 2.2 : 1.6, isMe ? 1.5 : 1.0]} />
+                  <meshBasicMaterial transparent />
+                </mesh>
                 <TerminalScreen
-                  width={isMe ? 2.2 : 1.7}
-                  height={isMe ? 1.5 : 1.1}
+                  width={isMe ? 2.2 : 1.6}
+                  height={isMe ? 1.5 : 1.0}
                   color={color}
                   data={data}
                   statusColor={sc}
                   variant={isMe ? 'me' : undefined}
                 />
-                {/* Bottom accent */}
-                <mesh position={[0, isMe ? -0.9 : -0.75, 0.04]}>
-                  <boxGeometry args={[isMe ? 2.2 : 1.7, 0.07, 0.02]} />
-                  <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.0} />
+                {/* Bottom accent bar */}
+                <mesh position={[0, isMe ? -0.88 : -0.7, 0.04]}>
+                  <boxGeometry args={[isMe ? 2.2 : 1.6, 0.07, 0.02]} />
+                  <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.5} />
                 </mesh>
               </group>
 
-              {/* Station label */}
-              <Text position={[0, -0.1, 0.85]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
+              {/* Floor label */}
+              <Text position={[0, -0.12, 0.8]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
                 {label}
               </Text>
-              <Text position={[0, -0.1 + 0.28, 0.85]} fontSize={0.1} color={color} anchorX="center" anchorY="middle" fillOpacity={0.5}>
+              <Text position={[0, -0.12 + 0.27, 0.8]} fontSize={0.1} color={color} anchorX="center" anchorY="middle" fillOpacity={0.5}>
                 {data ? String(data.value1) : '--'} {data?.unit || ''}
               </Text>
             </group>

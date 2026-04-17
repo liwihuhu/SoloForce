@@ -79,84 +79,96 @@ export const PRESET_EMPLOYEES: Employee[] = [
     name: '董事长', 
     type: 'superadmin', 
     avatar: EMPLOYEE_AVATARS.superadmin,
-    description: '终极管理员，权限最高，不存在上级'
+    description: '终极管理员，权限最高，不存在上级',
+    status: 'idle'
   },
   { 
     id: 'emp-exec', 
     name: 'OpenClaw执行官', 
     type: 'executor', 
     avatar: EMPLOYEE_AVATARS.executor,
-    description: '汇总执行层输出，优化任务，形成可执行命令'
+    description: '汇总执行层输出，优化任务，形成可执行命令',
+    status: 'idle'
   },
   { 
     id: 'emp-1', 
     name: '张经理', 
     type: 'manager', 
     avatar: EMPLOYEE_AVATARS.manager,
-    description: '团队负责人，负责整体协调和决策'
+    description: '团队负责人，负责整体协调和决策',
+    status: 'idle'
   },
   { 
     id: 'emp-2', 
     name: '陈开发', 
     type: 'developer', 
     avatar: EMPLOYEE_AVATARS.developer,
-    description: '后端开发，擅长 Java/Go'
+    description: '后端开发，擅长 Java/Go',
+    status: 'idle'
   },
   { 
     id: 'emp-3', 
     name: '刘前端', 
     type: 'developer', 
     avatar: EMPLOYEE_AVATARS.developer,
-    description: '前端开发，擅长 React/Vue'
+    description: '前端开发，擅长 React/Vue',
+    status: 'idle'
   },
   { 
     id: 'emp-4', 
     name: '林设计', 
     type: 'designer', 
     avatar: EMPLOYEE_AVATARS.designer,
-    description: 'UI/UX 设计师'
+    description: 'UI/UX 设计师',
+    status: 'idle'
   },
   { 
     id: 'emp-5', 
     name: '徐分析', 
     type: 'analyst', 
     avatar: EMPLOYEE_AVATARS.analyst,
-    description: '数据分析师'
+    description: '数据分析师',
+    status: 'idle'
   },
   { 
     id: 'emp-6', 
     name: '王文案', 
     type: 'writer', 
     avatar: EMPLOYEE_AVATARS.writer,
-    description: '内容创作者'
+    description: '内容创作者',
+    status: 'idle'
   },
   { 
     id: 'emp-7', 
     name: '赵客服', 
     type: 'support', 
     avatar: EMPLOYEE_AVATARS.support,
-    description: '客户支持'
+    description: '客户支持',
+    status: 'idle'
   },
   { 
     id: 'emp-8', 
     name: '孙研究', 
     type: 'researcher', 
     avatar: EMPLOYEE_AVATARS.researcher,
-    description: '技术研究员'
+    description: '技术研究员',
+    status: 'idle'
   },
   { 
     id: 'emp-9', 
     name: '周测试', 
     type: 'qa', 
     avatar: EMPLOYEE_AVATARS.qa,
-    description: '测试工程师'
+    description: '测试工程师',
+    status: 'idle'
   },
   { 
     id: 'emp-10', 
     name: '吴销售', 
     type: 'sales', 
     avatar: EMPLOYEE_AVATARS.sales,
-    description: '销售代表'
+    description: '销售代表',
+    status: 'idle'
   },
 ];
 

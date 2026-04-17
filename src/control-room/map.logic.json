@@ -1,0 +1,121 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "schema": "sf-control-room/map.logic.v1"
+  },
+  "floors": [
+    {
+      "id": "1f",
+      "label": "1F 大厅",
+      "labelEn": "Lobby",
+      "floorIndex": 1,
+      "rooms": [
+        {
+          "id": "lobby",
+          "label": "大厅",
+          "bounds": [150, 180, 500, 300],
+          "workZones": [
+            { "id": "reception", "label": "接待台", "anchor": { "x": 350, "y": 280 }, "type": "info", "panel": "welcome", "radius": 22 },
+            { "id": "elevator", "label": "电梯", "anchor": { "x": 450, "y": 280 }, "type": "navigation", "action": "floor_select", "radius": 22 },
+            { "id": "lounge", "label": "休息区", "anchor": { "x": 400, "y": 380 }, "type": "info", "panel": "announcements", "radius": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2f",
+      "label": "2F 人事部",
+      "labelEn": "HR Office",
+      "floorIndex": 2,
+      "rooms": [
+        {
+          "id": "hr",
+          "label": "人事部",
+          "bounds": [150, 180, 500, 300],
+          "workZones": [
+            { "id": "employee_1", "label": "工位 A", "anchor": { "x": 280, "y": 280 }, "type": "employee", "employeeId": "emp-1", "radius": 22 },
+            { "id": "employee_2", "label": "工位 B", "anchor": { "x": 350, "y": 280 }, "type": "employee", "employeeId": "emp-2", "radius": 22 },
+            { "id": "employee_3", "label": "工位 C", "anchor": { "x": 420, "y": 280 }, "type": "employee", "employeeId": "emp-3", "radius": 22 },
+            { "id": "hr_desk", "label": "人事台", "anchor": { "x": 550, "y": 350 }, "type": "info", "panel": "hr_desk", "radius": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3f",
+      "label": "3F 运营部",
+      "labelEn": "Operations",
+      "floorIndex": 3,
+      "rooms": [
+        {
+          "id": "ops",
+          "label": "运营部",
+          "bounds": [150, 180, 500, 300],
+          "workZones": [
+            { "id": "topology", "label": "拓扑墙", "anchor": { "x": 350, "y": 250 }, "type": "topology", "panel": "team_topology", "radius": 25 },
+            { "id": "coord", "label": "协调桌", "anchor": { "x": 350, "y": 380 }, "type": "task", "panel": "task_distribute", "radius": 22 },
+            { "id": "server", "label": "服务器", "anchor": { "x": 550, "y": 300 }, "type": "system", "panel": "server_status", "radius": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4f",
+      "label": "4F 指挥中心",
+      "labelEn": "Command Center",
+      "floorIndex": 4,
+      "rooms": [
+        {
+          "id": "command",
+          "label": "指挥中心",
+          "bounds": [150, 180, 500, 300],
+          "workZones": [
+            { "id": "ceo", "label": "董事长台", "anchor": { "x": 280, "y": 280 }, "type": "task", "panel": "task_input", "radius": 22 },
+            { "id": "executor", "label": "执行官台", "anchor": { "x": 420, "y": 280 }, "type": "task", "panel": "executor_dispatch", "radius": 22 },
+            { "id": "task_desk", "label": "任务台", "anchor": { "x": 350, "y": 380 }, "type": "task", "panel": "task_center", "radius": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5f",
+      "label": "5F 档案中心",
+      "labelEn": "Archive Center",
+      "floorIndex": 5,
+      "rooms": [
+        {
+          "id": "archive",
+          "label": "档案中心",
+          "bounds": [150, 180, 500, 300],
+          "workZones": [
+            { "id": "shelf_a", "label": "档案架 A", "anchor": { "x": 250, "y": 280 }, "type": "document", "panel": "document_browser", "radius": 22 },
+            { "id": "shelf_b", "label": "档案架 B", "anchor": { "x": 350, "y": 280 }, "type": "document", "panel": "document_browser", "radius": 22 },
+            { "id": "shelf_c", "label": "档案架 C", "anchor": { "x": 450, "y": 280 }, "type": "document", "panel": "document_browser", "radius": 22 },
+            { "id": "reading", "label": "阅读台", "anchor": { "x": 550, "y": 350 }, "type": "document", "panel": "document_preview", "radius": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6f",
+      "label": "6F 服务器机房",
+      "labelEn": "Server Room",
+      "floorIndex": 6,
+      "rooms": [
+        {
+          "id": "server",
+          "label": "服务器机房",
+          "bounds": [150, 180, 500, 300],
+          "workZones": [
+            { "id": "rack_1", "label": "机柜 1", "anchor": { "x": 240, "y": 280 }, "type": "system", "panel": "server_detail", "radius": 20 },
+            { "id": "rack_2", "label": "机柜 2", "anchor": { "x": 310, "y": 280 }, "type": "system", "panel": "server_detail", "radius": 20 },
+            { "id": "rack_3", "label": "机柜 3", "anchor": { "x": 380, "y": 280 }, "type": "system", "panel": "server_detail", "radius": 20 },
+            { "id": "rack_4", "label": "机柜 4", "anchor": { "x": 450, "y": 280 }, "type": "system", "panel": "server_detail", "radius": 20 },
+            { "id": "ups", "label": "UPS", "anchor": { "x": 550, "y": 320 }, "type": "system", "panel": "power_status", "radius": 22 },
+            { "id": "console", "label": "控制台", "anchor": { "x": 350, "y": 400 }, "type": "system", "panel": "system_monitor", "radius": 22 }
+          ]
+        }
+      ]
+    }
+  ]
+}

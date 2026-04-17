@@ -17,6 +17,8 @@ import TeamManagement from './pages/TeamManagement';
 import EmployeeManagement from './pages/EmployeeManagement';
 import TaskCenter from './pages/TaskCenter';
 import Settings from './pages/Settings';
+
+import Floor3DDemo from './control-room/Floor3DDemo';
 import { useTopologyStore } from './store';
 
 const nodeTypes = {
@@ -469,9 +471,15 @@ export default function App() {
         </div>
 
         {/* 导航链接 */}
-        <NavLink 
-          active={currentPage === '/'} 
+        <NavLink
+          active={currentPage === '/'}
           onClick={() => navigate('/')}
+        >
+          🗺️ 公司地图
+        </NavLink>
+        <NavLink 
+          active={currentPage === '/topology'} 
+          onClick={() => navigate('/topology')}
         >
           团队拓扑
         </NavLink>
@@ -519,11 +527,11 @@ export default function App() {
       {/* 主内容区 */}
       <div style={{ flex: 1, height: 'calc(100vh - 56px)', marginTop: '56px', overflow: 'hidden' }}>
         <Routes>
-          <Route path="/" element={<MainView />} />
+          <Route path="/" element={<Floor3DDemo />} />
+          <Route path="/topology" element={<MainView />} />
           <Route path="/teams" element={<TeamManagement />} />
           <Route path="/employees" element={<EmployeeManagement />} />
           <Route path="/tasks" element={<TaskCenter />} />
-          <Route path="/topology" element={<TeamTopology />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>

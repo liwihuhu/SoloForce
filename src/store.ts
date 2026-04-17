@@ -211,7 +211,7 @@ interface TopologyState {
   getSubordinates: (employeeId: string) => string[];
   getManager: (employeeId: string) => string | null;
   clearRelationships: () => void;
-  saveRelationships: (path: string) => Promise<any>;
+  saveRelationships: (path?: string) => Promise<any>;
   loadRelationships: (relationships: Relationship[]) => void;
   loadFromServer: () => Promise<void>;
   reloadEmployees: () => Promise<void>;

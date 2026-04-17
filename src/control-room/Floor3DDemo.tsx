@@ -2498,7 +2498,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
               <torusGeometry args={[2.0, 0.02, 8, 80]} />
               <meshStandardMaterial color="#8090c0" emissive="#5070a0" emissiveIntensity={0.8} transparent opacity={0.5} />
             </mesh>
-          </mesh>
+          </group>
           {/* Main white sphere (breathing) */}
           <mesh ref={coreRef}>
             <sphereGeometry args={[1.0, 48, 48]} />

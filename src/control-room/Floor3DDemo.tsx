@@ -2382,10 +2382,11 @@ function Floor3DScene({ floorId }: { floorId: string }) {
   
   
   
+  
   if (floorId === '6f') {
     // ================================================================
-    // 6F SPACESHIP COMMAND — 静谧星舰 · Elegant Sci-Fi
-    // Clean: fixed screen direction, no duplicate layers
+    // 6F OPENCLAW ENGINE — Pixel Room Style (ClawLibrary-inspired)
+    // 8 terminal rooms in grid, each a "room zone", HUD overlay
     // ================================================================
 
     const [ocStatus, setOcStatus] = useState<any>(null);
@@ -2420,206 +2421,181 @@ function Floor3DScene({ floorId }: { floorId: string }) {
     }, [ocStatus]);
 
     const statusColorMap: Record<string, string> = {
-      ONLINE: '#22C55E', OFFLINE: '#EF4444', CONNECTED: '#22C55E',
-      IDLE: '#FBBF24', ACTIVE: '#60A5FA', LIVE: '#22C55E',
-      LOADED: '#22C55E', READY: '#22C55E',
+      ONLINE: '#7cf0d0', OFFLINE: '#ff7b7b', CONNECTED: '#7cf0d0',
+      IDLE: '#ffcf63', ACTIVE: '#64d7b0', LIVE: '#7cf0d0',
+      LOADED: '#7cf0d0', READY: '#7cf0d0',
     };
 
-    // Core breathing + ring spin
-    const coreRef = useRef<THREE.Mesh>(null!);
-    const ringRef = useRef<THREE.Group>(null!);
-    useFrame(({ clock }) => {
-      if (!coreRef.current) return;
-      const t = clock.getElapsedTime();
-      const b = Math.sin(t * 0.9) * 0.04 + 1.0;
-      coreRef.current.scale.setScalar(b);
-      if (ringRef.current) ringRef.current.rotation.z = t * 0.12;
-    });
+    // 8 terminals: 2 rows × 4 columns (pixel room grid)
+    const terminals = [
+      { x: -5.5, z: -2.8, color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
+      { x: -1.8, z: -2.8, color: '#64d7b0', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
+      { x:  1.8, z: -2.8, color: '#8ecbff', label: 'GATEWAY',  key: 'GATEWAY', isMe: false },
+      { x:  5.5, z: -2.8, color: '#ffcf63', label: 'TASKS',    key: 'TASKS',   isMe: false },
+      { x: -5.5, z:  2.8, color: '#d49cff', label: 'MEMORY',   key: 'MEMORY',  isMe: false },
+      { x: -1.8, z:  2.8, color: '#8dd7ff', label: 'SESSIONS', key: 'SESSIONS', isMe: false },
+      { x:  1.8, z:  2.8, color: '#ffd27f', label: 'SKILLS',   key: 'SKILLS', isMe: false },
+      { x:  5.5, z:  2.8, color: '#ff9f7b', label: 'MCP',      key: 'MCP',    isMe: false },
+    ];
 
-    // Station gentle float
-    const stationRefs = useRef<(THREE.Group | null)[]>([]);
+    // Floor label refs for floating
+    const floorLabelRefs = useRef<(THREE.Group | null)[]>([]);
     useFrame(({ clock }) => {
       const t = clock.getElapsedTime();
-      stationRefs.current.forEach((ref, i) => {
+      floorLabelRefs.current.forEach((ref, i) => {
         if (!ref) return;
-        ref.position.y = Math.sin(t * 0.5 + i * 0.75) * 0.07;
+        ref.position.y = Math.sin(t * 1.2 + i * 0.8) * 0.08;
       });
     });
-
-    // 8 stations: arc layout, ME front-center
-    const stations = [
-      { x:  0,    z: -5.2, color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
-      { x: -4.8,  z: -2.6, color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
-      { x:  4.8,  z: -2.6, color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
-      { x: -6.2,  z:  0.5, color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY',   isMe: false },
-      { x:  6.2,  z:  0.5, color: '#38BDF8', label: 'SESSIONS', key: 'SESSIONS', isMe: false },
-      { x: -4.2,  z:  3.8, color: '#60A5FA', label: 'TASKS',    key: 'TASKS',    isMe: false },
-      { x:  4.2,  z:  3.8, color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS',   isMe: false },
-      { x:  0,    z:  5.2, color: '#FB923C', label: 'MCP',      key: 'MCP',      isMe: false },
-    ];
 
     return (
       <group position={[0, -floorIndex * FLOOR_HEIGHT, 0]}>
 
-        {/* ======= FLOOR (single, clean) ======= */}
+        {/* ======= PIXEL FLOOR (dark grid) ======= */}
         <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[22, 18]} />
-          <meshStandardMaterial color="#e8eef4" roughness={0.15} metalness={0.55} emissive="#c0d0e8" emissiveIntensity={0.04} />
+          <meshStandardMaterial color="#0a0e14" roughness={0.2} metalness={0.4} emissive="#0a1820" emissiveIntensity={0.08} />
         </mesh>
-        <gridHelper args={[22, 44, '#c8d8e8', '#d0dce8']} position={[0, 0.003, 0]} opacity={0.22} transparent />
-
-        {/* ======= CORE PLATFORM (single circular base) ======= */}
-        <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[2.6, 48]} />
-          <meshStandardMaterial color="#f0f4f8" roughness={0.1} metalness={0.7} emissive="#d0e0f0" emissiveIntensity={0.04} />
-        </mesh>
-        <mesh position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[2.45, 2.62, 48]} />
-          <meshStandardMaterial color="#7090b0" emissive="#4060a0" emissiveIntensity={0.8} side={THREE.DoubleSide} />
-        </mesh>
+        {/* Grid lines */}
+        <gridHelper args={[22, 44, '#1a2a3a', '#141e2a']} position={[0, 0.004, 0]} opacity={0.5} transparent />
 
         {/* ======= LIGHTING ======= */}
-        <ambientLight intensity={1.0} color="#e0eaff" />
-        <directionalLight position={[0, 10, 0]} intensity={1.5} color="#ffffff" />
-        <pointLight position={[0, 4, 0]} intensity={3.0} color="#7090c0" distance={20} />
-        <pointLight position={[0, 3, 0]} intensity={4.5} color="#6080c0" distance={14} />
-        <pointLight position={[-8, 2, 4]} intensity={0.8} color="#80a0d0" distance={14} />
-        <pointLight position={[8, 2, -4]} intensity={0.8} color="#80a0d0" distance={14} />
+        <ambientLight intensity={0.8} color="#c0d8ff" />
+        <pointLight position={[0, 6, 0]} intensity={2.5} color="#7cf0d0" distance={20} />
+        <pointLight position={[0, 3, 0]} intensity={3.0} color="#64d7b0" distance={14} />
+        <pointLight position={[-8, 2, 4]} intensity={1.0} color="#d49cff" distance={12} />
+        <pointLight position={[8, 2, -4]} intensity={1.0} color="#8ecbff" distance={12} />
 
-        {/* ======= CORE: White sphere + spinning rings ======= */}
-        <group position={[0, 2.8, 0]}>
-          {/* Spinning ring group */}
-          <group ref={ringRef}>
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[2.0, 0.025, 8, 80]} />
-              <meshStandardMaterial color="#6090c0" emissive="#4060a0" emissiveIntensity={1.0} transparent opacity={0.7} />
-            </mesh>
-            <mesh rotation={[Math.PI / 3, 0.3, 0]}>
-              <torusGeometry args={[2.0, 0.02, 8, 80]} />
-              <meshStandardMaterial color="#8090c0" emissive="#5070a0" emissiveIntensity={0.8} transparent opacity={0.5} />
-            </mesh>
-          </group>
-          {/* Main white sphere (breathing) */}
-          <mesh ref={coreRef}>
-            <sphereGeometry args={[1.0, 48, 48]} />
-            <meshStandardMaterial color="#f5f8fc" roughness={0.05} metalness={0.88} emissive="#c0d0f0" emissiveIntensity={0.28} />
+        {/* ======= CENTRAL CORE — small glowing orb ======= */}
+        <group position={[0, 1.8, 0]}>
+          {/* Outer glow ring */}
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[1.2, 0.025, 8, 48]} />
+            <meshStandardMaterial color="#7cf0d0" emissive="#7cf0d0" emissiveIntensity={1.5} transparent opacity={0.6} />
           </mesh>
-          {/* Inner glow core */}
+          <mesh rotation={[Math.PI / 3, 0.3, 0]}>
+            <torusGeometry args={[1.0, 0.02, 8, 48]} />
+            <meshStandardMaterial color="#64d7b0" emissive="#64d7b0" emissiveIntensity={1.2} transparent opacity={0.5} />
+          </mesh>
+          {/* Core sphere */}
           <mesh>
-            <sphereGeometry args={[0.5, 24, 24]} />
-            <meshStandardMaterial color="#7090c0" roughness={0.0} metalness={1.0} emissive="#5070b0" emissiveIntensity={2.5} transparent opacity={0.75} />
+            <sphereGeometry args={[0.6, 24, 24]} />
+            <meshStandardMaterial color="#001a0e" roughness={0.05} metalness={0.95} emissive="#7cf0d0" emissiveIntensity={0.6} />
           </mesh>
-          <pointLight intensity={5.5} color="#5070b0" distance={16} />
+          {/* Inner bright core */}
+          <mesh>
+            <sphereGeometry args={[0.25, 16, 16]} />
+            <meshStandardMaterial color="#7cf0d0" roughness={0.0} metalness={1.0} emissive="#7cf0d0" emissiveIntensity={4.0} />
+          </mesh>
+          <pointLight intensity={4.0} color="#7cf0d0" distance={12} />
         </group>
 
-        {/* ======= CENTRAL DASHBOARD SCREEN ======= */}
-        <group position={[0, 1.6, 3.6]} rotation={[-0.15, 0, 0]}>
-          {/* White outer frame */}
-          <mesh position={[0, 0, -0.06]}>
-            <boxGeometry args={[5.6, 3.2, 0.1]} />
-            <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.85} emissive="#d0e0f0" emissiveIntensity={0.06} />
-          </mesh>
-          {/* Dark inner panel */}
-          <mesh position={[0, 0, 0]}>
-            <boxGeometry args={[5.25, 2.85, 0.04]} />
-            <meshStandardMaterial color="#080e18" roughness={0.05} metalness={0.3} />
-          </mesh>
-          {/* Canvas content */}
-          <mesh position={[0, 0, 0.005]}>
-            <planeGeometry args={[4.9, 2.55]} />
-            <meshBasicMaterial map={undefined} />
-          </mesh>
-          <CoreStatsScreen width={4.9} height={2.55} color="#8090c0" ocStatus={ocStatus} />
-          {/* Bottom status bar */}
-          <mesh position={[0, -1.52, 0.06]}>
-            <boxGeometry args={[4.9, 0.08, 0.02]} />
-            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.0} />
-          </mesh>
-        </group>
-
-        {/* ======= CONNECTION LINES (follow floating stations) ======= */}
-        {stations.map(({ x, z, color }, i) => (
-          <ConnectionLine key={i} from={[0, 2.8, 0]} to={[x, 1.7, z]} color={color} stationRef={stationRefs.current[i]} />
-        ))}
-
-        {/* ======= 8 TERMINAL STATIONS ======= */}
-        {stations.map(({ x, z, color, label, key, isMe }, i) => {
+        {/* ======= 8 TERMINAL ROOMS (2×4 grid) ======= */}
+        {terminals.map(({ x, z, color, label, key, isMe }, i) => {
           const data = terminalData?.[key];
-          const sc = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
+          const sc = statusColorMap[data?.status || 'OFFLINE'] || '#ff7b7b';
+          const W = 3.2, H = 2.4, D = 0.3;
 
           return (
             <group key={label} position={[x, 0, z]}>
 
-              {/* Circular platform */}
-              <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[1.1, 32]} />
-                <meshStandardMaterial color="#e8eef4" roughness={0.12} metalness={0.75} emissive={color} emissiveIntensity={0.05} />
+              {/* === Room box (hollow cabinet) === */}
+              {/* Back wall */}
+              <mesh position={[0, H/2, -D/2]}>
+                <boxGeometry args={[W, H, D/4]} />
+                <meshStandardMaterial color="#0c1218" roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.06} />
               </mesh>
-              {/* Ring accent */}
-              <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.85, 1.08, 32]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} side={THREE.DoubleSide} />
+              {/* Left wall */}
+              <mesh position={[-W/2, H/2, 0]}>
+                <boxGeometry args={[D/4, H, W]} />
+                <meshStandardMaterial color="#0c1218" roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.04} />
+              </mesh>
+              {/* Right wall */}
+              <mesh position={[W/2, H/2, 0]}>
+                <boxGeometry args={[D/4, H, W]} />
+                <meshStandardMaterial color="#0c1218" roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.04} />
+              </mesh>
+              {/* Top */}
+              <mesh position={[0, H, 0]}>
+                <boxGeometry args={[W, D/4, W]} />
+                <meshStandardMaterial color="#0c1218" roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.04} />
               </mesh>
 
-              {/* Thin pedestal */}
-              <mesh position={[0, 0.65, 0]}>
-                <cylinderGeometry args={[0.07, 0.09, 1.2, 10]} />
-                <meshStandardMaterial color="#d0d8e4" roughness={0.15} metalness={0.9} />
+              {/* === Floor tile === */}
+              <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[W - 0.1, W - 0.1]} />
+                <meshStandardMaterial color="#080e14" roughness={0.2} metalness={0.5} emissive={color} emissiveIntensity={0.04} />
               </mesh>
 
-              {/* Status orb */}
-              <mesh position={[0, 1.5, 0]}>
-                <sphereGeometry args={[0.11, 10, 10]} />
-                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={3.0} />
-              </mesh>
-              <pointLight position={[0, 1.5, 0]} intensity={1.0} color={sc} distance={4} />
-
-              {/* Screen — faces TOWARD center (removed +PI bug) */}
-              <group
-                ref={el => { stationRefs.current[i] = el as any; }}
-                position={[0, 1.6, 0]}
-                rotation={[0, Math.atan2(x, z), 0]}
-              >
-                {/* Frame */}
-                <mesh position={[0, 0, -0.04]}>
-                  <boxGeometry args={[isMe ? 2.6 : 2.0, isMe ? 1.9 : 1.4, 0.06]} />
-                  <meshStandardMaterial color="#f0f4f8" roughness={0.12} metalness={0.88} emissive={color} emissiveIntensity={0.08} />
-                </mesh>
-                {/* Dark inner */}
-                <mesh position={[0, 0, 0]}>
-                  <boxGeometry args={[isMe ? 2.4 : 1.8, isMe ? 1.7 : 1.2, 0.03]} />
-                  <meshStandardMaterial color="#08101e" roughness={0.05} metalness={0.3} />
-                </mesh>
-                {/* Canvas screen (front) */}
-                <mesh position={[0, 0, 0.01]}>
-                  <planeGeometry args={[isMe ? 2.2 : 1.6, isMe ? 1.5 : 1.0]} />
-                  <meshBasicMaterial transparent />
-                </mesh>
+              {/* === Screen on back wall === */}
+              <group position={[0, H/2, -D/4 + 0.01]}>
                 <TerminalScreen
-                  width={isMe ? 2.2 : 1.6}
-                  height={isMe ? 1.5 : 1.0}
+                  width={isMe ? 2.8 : 2.4}
+                  height={isMe ? 2.0 : 1.8}
                   color={color}
                   data={data}
                   statusColor={sc}
                   variant={isMe ? 'me' : undefined}
                 />
-                {/* Bottom accent bar */}
-                <mesh position={[0, isMe ? -0.88 : -0.7, 0.04]}>
-                  <boxGeometry args={[isMe ? 2.2 : 1.6, 0.07, 0.02]} />
-                  <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.5} />
-                </mesh>
               </group>
 
-              {/* Floor label */}
-              <Text position={[0, -0.12, 0.8]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
-                {label}
-              </Text>
-              <Text position={[0, -0.12 + 0.27, 0.8]} fontSize={0.1} color={color} anchorX="center" anchorY="middle" fillOpacity={0.5}>
-                {data ? String(data.value1) : '--'} {data?.unit || ''}
-              </Text>
+              {/* === Status orb (top of room) === */}
+              <mesh position={[0, H + 0.15, -D/2 + 0.1]}>
+                <sphereGeometry args={[0.18, 12, 12]} />
+                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={3.0} />
+              </mesh>
+              <pointLight position={[0, H + 0.15, -D/2 + 0.1]} intensity={1.5} color={sc} distance={5} />
+
+              {/* === Floor glow ring === */}
+              <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.7, 1.0, 6]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} side={THREE.DoubleSide} />
+              </mesh>
+
+              {/* === Room label (floating below) === */}
+              <group
+                ref={el => { floorLabelRefs.current[i] = el as any; }}
+                position={[0, 0.1, W/2 + 0.3]}
+              >
+                <Text
+                  position={[0, 0, 0]}
+                  fontSize={0.28}
+                  color={color}
+                  anchorX="center"
+                  anchorY="middle"
+                  font="https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2"
+                >
+                  {label}
+                </Text>
+                {/* Status dot + value */}
+                <Text
+                  position={[0, -0.38, 0]}
+                  fontSize={0.16}
+                  color={sc}
+                  anchorX="center"
+                  anchorY="middle"
+                  font="https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2"
+                >
+                  {data ? `${data.value1} ${data.unit || ''}` : '--'}
+                </Text>
+              </group>
+
             </group>
           );
         })}
+
+        {/* ======= HUD TOP BAR (center ceiling) ======= */}
+        <group position={[0, 5.8, 0]}>
+          <Text
+            fontSize={0.35}
+            color="#7cf0d0"
+            anchorX="center"
+            anchorY="middle"
+            font="https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2"
+          >
+            OPENCLAW ENGINE v1.0
+          </Text>
+        </group>
 
       </group>
     );

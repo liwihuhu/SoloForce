@@ -2167,8 +2167,8 @@ function Floor3DScene({ floorId }: { floorId: string }) {
         ))}
 
         {/* ===== 三块数据驱动大屏 ===== */}
-        {/* 左屏 - 待处理任务统计 */}
-        <group position={[-3.2, 2.1, -3.7]}>
+        {/* 左屏 - 向中倾斜20度 */}
+        <group position={[-3.4, 2.1, -3.5]} rotation={[0, Math.PI / 9, 0]}>
           {/* 边框 */}
           <mesh position={[0, 0, -0.08]}>
             <boxGeometry args={[3.4, 2.4, 0.12]} />
@@ -2184,7 +2184,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <pointLight position={[0, 0, 1]} intensity={0.6} color={config.glowColor} distance={5} />
         </group>
 
-        {/* 中央主屏 - 任务指挥总屏 */}
+        {/* 中央主屏 - 保持正中 */}
         <group position={[0, 2.5, -3.9]}>
           {/* 边框 */}
           <mesh position={[0, 0, -0.1]}>
@@ -2201,8 +2201,8 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <pointLight position={[0, 0, 1]} intensity={1.0} color={config.glowColor} distance={8} />
         </group>
 
-        {/* 右屏 - 已完成任务统计 */}
-        <group position={[3.2, 2.1, -3.7]}>
+        {/* 右屏 - 向中倾斜20度 */}
+        <group position={[3.4, 2.1, -3.5]} rotation={[0, -Math.PI / 9, 0]}>
           {/* 边框 */}
           <mesh position={[0, 0, -0.08]}>
             <boxGeometry args={[3.4, 2.4, 0.12]} />
@@ -2218,47 +2218,14 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <pointLight position={[0, 0, 1]} intensity={0.6} color={config.glowColor} distance={5} />
         </group>
 
-        {/* ===== 环形任务流转操控台 ===== */}
-        {/* 外圈光环 */}
-        <mesh position={[0, 0.72, 0.8]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[2.5, 0.06, 8, 64]} />
-          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} roughness={0.2} metalness={0.6} />
-        </mesh>
-        {/* 外圈节点（6个工位） */}
-        {[0, 1, 2, 3, 4, 5].map((i) => {
-          const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
-          const nx = Math.cos(angle) * 2.5;
-          const nz = Math.sin(angle) * 2.5 + 0.8;
-          return (
-            <group key={i} position={[nx, 0.72, nz]}>
-              {/* 工位节点 */}
-              <mesh>
-                <cylinderGeometry args={[0.18, 0.18, 0.06, 12]} />
-                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.2} roughness={0.3} metalness={0.7} />
-              </mesh>
-              {/* 工位小屏 */}
-              <mesh position={[Math.cos(angle) * 0.28, 0.22, Math.sin(angle) * 0.28]}>
-                <boxGeometry args={[0.35, 0.25, 0.02]} />
-                <meshStandardMaterial color="#001018" emissive={config.glowColor} emissiveIntensity={0.8} roughness={0.1} metalness={0.4} />
-              </mesh>
-            </group>
-          );
-        })}
-        {/* 中心指挥球 */}
-        <mesh position={[0, 0.72, 0.8]}>
-          <sphereGeometry args={[0.3, 16, 16]} />
-          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.2} metalness={0.5} />
-        </mesh>
-        <pointLight position={[0, 0.72, 0.8]} intensity={1.5} color={config.glowColor} distance={4} />
-
-        {/* 屏幕顶部横梁 */}
-        <mesh position={[-0.5, 4.3, -3.8]}>
-          <boxGeometry args={[8.5, 0.08, 0.08]} />
+        {/* 屏幕顶部横梁（配合夹角略微加宽） */}
+        <mesh position={[0, 4.35, -3.6]}>
+          <boxGeometry args={[9.5, 0.08, 0.08]} />
           <meshStandardMaterial color={config.wallColor} roughness={0.3} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.5} />
         </mesh>
-        {/* 侧面支撑柱 */}
-        {[-5, 5].map((x, i) => (
-          <mesh key={i} position={[x, 1.5, -3.8]}>
+        {/* 侧面支撑柱（向外偏移匹配夹角） */}
+        {[-5.8, 5.8].map((x, i) => (
+          <mesh key={i} position={[x, 1.5, -3.5]}>
             <boxGeometry args={[0.1, 3.0, 0.1]} />
             <meshStandardMaterial color={config.wallColor} roughness={0.3} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.2} />
           </mesh>

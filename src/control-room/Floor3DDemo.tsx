@@ -2134,12 +2134,6 @@ function Floor3DScene({ floorId }: { floorId: string }) {
 
           return (
             <group key={team.id} position={[tableX, 0, 0]}>  
-              {/* 地面团队区域光圈 */}
-              <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[2.4, 32]} />
-                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.08} transparent opacity={0.45} />
-              </mesh>
-
               {/* 会议桌 */}
               <MeetingTable color={config.glowColor} />
 

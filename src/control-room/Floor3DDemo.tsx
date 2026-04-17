@@ -736,7 +736,7 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
 
 // ===========================================
 // 6F OpenClaw机房 - 单个终端数据屏幕
-function TerminalScreen({ width, height, color, data, statusColor }: { width: number; height: number; color: string; data: any; statusColor: string }) {
+function TerminalScreen({ width, height, color, data, statusColor, variant }: { width: number; height: number; color: string; data: any; statusColor: string; variant?: string }) {
   const meshRef = useRef<THREE.Mesh>(null!);
   const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 512; return c; }, []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
@@ -798,6 +798,78 @@ function TerminalScreen({ width, height, color, data, statusColor }: { width: nu
     }
     texture.needsUpdate = true;
   }, [data, statusColor]);
+    // Special ME mode - show AI assistant info
+    if (variant === 'me' && data) {
+      const ctx = canvas.getContext('2d')!;
+      const W = 512, H = 512;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0a0020';
+      ctx.fillRect(0, 0, W, H);
+      // Purple gradient top
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#4a0080');
+      grad.addColorStop(1, '#0a0020');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      // Top bar
+      ctx.fillStyle = '#E879F9';
+      ctx.fillRect(0, 0, W, 16);
+      // Status badge
+      ctx.fillStyle = '#22C55E';
+      ctx.beginPath();
+      ctx.roundRect(W - 130, 24, 115, 32, 6);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 13px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('● ONLINE', W - 72, 46);
+      // Avatar circle
+      ctx.fillStyle = '#E879F9';
+      ctx.beginPath();
+      ctx.arc(W/2, 100, 44, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 28px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('AI', W/2, 112);
+      // Name
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px "SF Mono", monospace';
+      ctx.fillText('Hlw\'s OpenClaw', W/2, 175);
+      ctx.fillStyle = '#E879F9';
+      ctx.font = 'bold 16px "SF Mono", monospace';
+      ctx.fillText('Bot', W/2, 198);
+      // Divider
+      ctx.fillStyle = '#E879F9';
+      ctx.fillRect(40, 220, W - 80, 2);
+      // Info rows
+      const rows = [
+        { label: 'MODEL', value: 'MiniMax-M2.7' },
+        { label: 'SESSIONS', value: String(data.value2 || 2) },
+        { label: 'MEMORY', value: String(data.value3 || 65) + ' files' },
+        { label: 'SKILLS', value: '12+ active' },
+      ];
+      rows.forEach((row, i) => {
+        const y = 260 + i * 55;
+        ctx.fillStyle = '#E879F9';
+        ctx.font = 'bold 11px "SF Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(row.label, 40, y);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 24px "SF Mono", monospace';
+        ctx.fillText(row.value, 40, y + 26);
+      });
+      // Bottom glow bar
+      ctx.fillStyle = '#E879F9';
+      ctx.fillRect(0, H - 30, W, 30);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 12px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('🦠 OPENCLAW AI ASSISTANT 🦠', W/2, H - 10);
+      texture.needsUpdate = true;
+      return;
+    }
+
 
   return (
     <mesh ref={meshRef}>
@@ -2113,6 +2185,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
         SKILLS: { value1: 12, value2: 8, status: 'LOADED', unit: 'skills' },
         MCP: { value1: 4, value2: 12, status: 'READY', unit: 'tools' },
         SCHEDULE: { value1: d.tasks?.tracked ?? 8, status: 'RUNNING', unit: 'jobs' },
+        ME: { value1: 1, value2: d.sessions?.active ?? 2, value3: d.memory?.files ?? 65, status: 'ONLINE', unit: 'sessions' },
       };
     }, [ocStatus]);
 
@@ -2129,6 +2202,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       ONLINE: '#22C55E', OFFLINE: '#EF4444', CONNECTED: '#22C55E',
       IDLE: '#FBBF24', ACTIVE: '#60A5FA', LIVE: '#22C55E',
       LOADED: '#22C55E', READY: '#22C55E', RUNNING: '#60A5FA',
+      '@ME': '#E879F9',
     };
 
     const terminals = [
@@ -2138,7 +2212,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       { x:  0,   z: -5.5, color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY' },
       { x:  3.9, z:  3.9, color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY' },
       { x: -3.9, z:  3.9, color: '#34D399', label: 'MCP',      key: 'MCP' },
-      { x:  3.9, z: -3.9, color: '#FB923C', label: 'LOGS',      key: 'SCHEDULE' },
+      { x:  3.9, z: -3.9, color: '#E879F9', label: 'ME',       key: 'ME' },
       { x: -3.9, z: -3.9, color: '#38BDF8', label: 'SCHEDULE', key: 'SCHEDULE' },
     ];
 
@@ -2293,7 +2367,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
                 <boxGeometry args={[2.0, 1.4, 0.04]} />
                 <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={color} emissiveIntensity={0.15} />
               </mesh>
-              <TerminalScreen width={1.9} height={1.3} color={color} data={data} statusColor={statusColor} />
+              <TerminalScreen width={1.9} height={1.3} color={color} data={data} statusColor={statusColor} variant={key === 'ME' ? 'me' : undefined} />
               {/* Top bar */}
               <mesh position={[0, 3.16, 0.94]} rotation={[0.35, 0, 0]}>
                 <boxGeometry args={[1.8, 0.12, 0.02]} />

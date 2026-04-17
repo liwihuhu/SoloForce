@@ -648,6 +648,28 @@ function EntranceWelcomeScreen({ position, color }: { position: [number, number,
 }
 
 // ===========================================
+// 6F Neural — Organic curved tube connection
+function OrganicTube({ x, z, color }: { x: number; z: number; color: string }) {
+  const geo = useMemo(() => {
+    const start = new THREE.Vector3(0, 2.5, 0);
+    const end = new THREE.Vector3(x, 1.85, z);
+    const mx = x * 0.5, mz = z * 0.5;
+    // Slight outward bow
+    const len = Math.sqrt(x*x + z*z);
+    const bx = -z / len * 0.6;
+    const bz =  x / len * 0.6;
+    const cpX = mx + bx, cpZ = mz + bz;
+    const curve = new THREE.QuadraticBezierCurve3(start, new THREE.Vector3(cpX, 2.8, cpZ), end);
+    return new THREE.TubeGeometry(curve, 20, 0.03, 8, false);
+  }, [x, z]);
+  return (
+    <mesh geometry={geo}>
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} transparent opacity={0.65} roughness={0.15} metalness={0.7} />
+    </mesh>
+  );
+}
+
+// ===========================================
 // 6F OpenClaw机房 - 超级大脑核心状态屏
 function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; height: number; color: string; ocStatus: any }) {
   const meshRef = useRef<THREE.Mesh>(null!);
@@ -2303,10 +2325,11 @@ function Floor3DScene({ floorId }: { floorId: string }) {
 
   
   
+  
   if (floorId === '6f') {
     // ================================================================
-    // 6F NEURAL NETWORK ENGINE — Synaptic AI Visualization
-    // Plan B: Organic growth, neural network nodes, orbiting terminals
+    // 6F NEURAL COMMAND CENTER — Organic + Readable Hybrid
+    // Semi-abstract: organic core, concrete terminal stations, clear data
     // ================================================================
 
     const [ocStatus, setOcStatus] = useState<any>(null);
@@ -2346,229 +2369,214 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       LOADED: '#22C55E', READY: '#22C55E',
     };
 
-    // Neural core ref (for breathing + slow rotation)
-    const neuralRef = useRef<THREE.Group>(null!);
+    // Core breathing animation
+    const coreRef = useRef<THREE.Mesh>(null!);
     useFrame(({ clock }) => {
-      if (!neuralRef.current) return;
+      if (!coreRef.current) return;
       const t = clock.getElapsedTime();
-      // Slow Y-axis rotation of entire neural core
-      neuralRef.current.rotation.y = t * 0.18;
-      // Inner sphere breathing
-      const b = Math.sin(t * 1.2) * 0.07 + 1.0;
-      neuralRef.current.children.forEach(child => {
-        if (child instanceof THREE.Mesh && child.geometry.type === 'SphereGeometry') {
-          child.scale.setScalar(b);
-        }
-      });
+      const b = Math.sin(t * 1.2) * 0.05 + 1.0;
+      coreRef.current.scale.setScalar(b);
     });
 
-    // Terminal node refs for floating animation
+    // Node gentle float
     const nodeRefs = useRef<(THREE.Group | null)[]>([]);
     useFrame(({ clock }) => {
       const t = clock.getElapsedTime();
       nodeRefs.current.forEach((ref, i) => {
         if (!ref) return;
-        const offset = i * (Math.PI * 2 / 8);
-        // Gentle vertical float
-        ref.position.y = 1.2 + Math.sin(t * 0.8 + offset) * 0.15;
+        ref.position.y = Math.sin(t * 0.6 + i * 0.7) * 0.12;
       });
     });
 
-    const neuralNodes = [
-      { angle: 0,          color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
-      { angle: Math.PI / 4,       color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
-      { angle: Math.PI / 2,       color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
-      { angle: Math.PI * 3 / 4,   color: '#60A5FA', label: 'TASKS',    key: 'TASKS',    isMe: false },
-      { angle: Math.PI,           color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY',   isMe: false },
-      { angle: Math.PI * 5 / 4,   color: '#38BDF8', label: 'SESSIONS', key: 'SESSIONS', isMe: false },
-      { angle: Math.PI * 3 / 2,   color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS',   isMe: false },
-      { angle: Math.PI * 7 / 4,   color: '#FB923C', label: 'MCP',      key: 'MCP',      isMe: false },
+    // 8 terminals in a ring, front row closer (readability)
+    const terminals = [
+      { x:  0,    z: -5.2, color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
+      { x: -4.4,  z: -2.8, color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
+      { x:  4.4,  z: -2.8, color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
+      { x: -5.2,  z:  0,   color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY',   isMe: false },
+      { x:  5.2,  z:  0,   color: '#38BDF8', label: 'SESSIONS', key: 'SESSIONS', isMe: false },
+      { x: -3.2,  z:  3.8, color: '#60A5FA', label: 'TASKS',    key: 'TASKS',    isMe: false },
+      { x:  3.2,  z:  3.8, color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS',   isMe: false },
+      { x:  0,    z:  5.2, color: '#FB923C', label: 'MCP',      key: 'MCP',      isMe: false },
     ];
-    const RING_RADIUS = 4.8;
 
     return (
       <group position={[0, -floorIndex * FLOOR_HEIGHT, 0]}>
 
-        {/* ===== Floor: organic cell texture ===== */}
+        {/* ===== Floor ===== */}
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[20, 16]} />
-          <meshStandardMaterial
-            color="#060d18"
-            roughness={0.15}
-            metalness={0.5}
-            emissive="#0a1830"
-            emissiveIntensity={0.08}
-            transparent
-            opacity={0.92}
-          />
+          <meshStandardMaterial color="#060e1a" roughness={0.2} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.05} />
         </mesh>
-        {/* Organic hex grid overlay */}
-        <gridHelper args={[20, 40, '#0d2040', '#0d2040']} position={[0, 0.005, 0]} opacity={0.35} transparent />
+        <gridHelper args={[20, 40, '#0d2040', '#0d2040']} position={[0, 0.005, 0]} opacity={0.3} transparent />
 
-        {/* Subtle concentric glow rings on floor */}
-        {[2.5, 5.0, 7.5].map((r, i) => (
-          <mesh key={i} position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[r - 0.04, r + 0.04, 48]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.3 - i * 0.08} transparent opacity={0.4 - i * 0.1} side={THREE.DoubleSide} />
+        {/* Raised circular platform under core */}
+        <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[2.8, 48]} />
+          <meshStandardMaterial color="#0a1830" roughness={0.2} metalness={0.8} emissive={config.glowColor} emissiveIntensity={0.08} />
+        </mesh>
+        <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[2.6, 2.9, 48]} />
+          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} />
+        </mesh>
+
+        {/* ===== Lights ===== */}
+        <pointLight position={[0, 5, 0]} intensity={2.5} color={config.glowColor} distance={20} />
+        <pointLight position={[0, 3, 0]} intensity={4.0} color={'#F472B6'} distance={14} />
+        <pointLight position={[-6, 2, 4]} intensity={1.2} color={'#60A5FA'} distance={12} />
+        <pointLight position={[6, 2, -4]} intensity={1.2} color={'#A78BFA'} distance={12} />
+
+        {/* ===== Organic Brain Core ===== */}
+        <group position={[0, 2.5, 0]}>
+          {/* Core sphere */}
+          <mesh ref={coreRef}>
+            <sphereGeometry args={[1.1, 32, 32]} />
+            <meshStandardMaterial color="#000d20" roughness={0.05} metalness={0.98} emissive={config.glowColor} emissiveIntensity={0.4} />
           </mesh>
-        ))}
-
-        {/* ===== Ambient lights ===== */}
-        <pointLight position={[0, 4, 0]} intensity={3.0} color={config.glowColor} distance={18} />
-        <pointLight position={[0, 2.5, 0]} intensity={5.0} color={'#F472B6'} distance={12} />
-        <pointLight position={[-6, 3, 4]} intensity={1.5} color={'#60A5FA'} distance={12} />
-        <pointLight position={[6, 3, -4]} intensity={1.5} color={'#A78BFA'} distance={12} />
-
-        {/* ===== NEURAL CORE (Dodecahedron + satellites) ===== */}
-        <group ref={neuralRef} position={[0, 2.2, 0]}>
-
-          {/* Main neural body — dodecahedron (organic polyhedron) */}
+          {/* Inner glow */}
           <mesh>
-            <dodecahedronGeometry args={[1.2, 0]} />
-            <meshStandardMaterial
-              color="#000d20"
-              roughness={0.05}
-              metalness={0.98}
-              emissive={config.glowColor}
-              emissiveIntensity={0.35}
-            />
+            <sphereGeometry args={[0.5, 16, 16]} />
+            <meshStandardMaterial color="#001840" roughness={0.0} metalness={1.0} emissive={config.glowColor} emissiveIntensity={3.0} />
           </mesh>
-
-          {/* Inner glowing core */}
-          <mesh>
-            <sphereGeometry args={[0.55, 16, 16]} />
-            <meshStandardMaterial
-              color="#001840"
-              roughness={0.0}
-              metalness={1.0}
-              emissive={config.glowColor}
-              emissiveIntensity={2.5}
-            />
-          </mesh>
-
-          {/* 12 vertex glow nodes (synaptic points) */}
-          {[[0,0,1.2],[0,0,-1.2],[0,1.2,0],[0,-1.2,0],[1.2,0,0],[-1.2,0,0],
-            [0.75,0.75,0.75],[-0.75,0.75,0.75],[0.75,-0.75,0.75],[-0.75,-0.75,0.75],
-            [0,0.75,0.75],[0,-0.75,0.75]].map((pos, i) => (
-            <mesh key={i} position={pos as [number, number, number]}>
-              <sphereGeometry args={[0.07, 8, 8]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={4.0} />
+          {/* 3 orbit rings */}
+          {[0, Math.PI / 3, Math.PI / 3 * 2].map((rot, i) => (
+            <mesh key={i} rotation={[rot, 0, 0]}>
+              <torusGeometry args={[1.6, 0.028, 8, 64]} />
+              <meshStandardMaterial color={i === 0 ? config.glowColor : i === 1 ? '#A78BFA' : '#60A5FA'} emissive={i === 0 ? config.glowColor : i === 1 ? '#A78BFA' : '#60A5FA'} emissiveIntensity={1.5} transparent opacity={0.7} />
             </mesh>
           ))}
-
-          {/* Orbit ring — horizontal */}
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[1.7, 0.025, 8, 64]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} transparent opacity={0.7} />
+          {/* Top ring halo */}
+          <mesh position={[0, 1.8, 0]}>
+            <torusGeometry args={[0.6, 0.04, 8, 32]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={3.0} />
           </mesh>
-          {/* Orbit ring — tilted */}
-          <mesh rotation={[Math.PI / 3, 0.4, 0]}>
-            <torusGeometry args={[1.7, 0.02, 8, 64]} />
-            <meshStandardMaterial color={'#A78BFA'} emissive={'#A78BFA'} emissiveIntensity={1.2} transparent opacity={0.5} />
+          {/* Bottom halo */}
+          <mesh position={[0, -1.8, 0]}>
+            <torusGeometry args={[0.6, 0.04, 8, 32]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
           </mesh>
-
-          {/* Central point light */}
-          <pointLight intensity={5.0} color={config.glowColor} distance={14} />
-
-          {/* ===== Neural synaptic connections (from core to each node position) ===== */}
-          {neuralNodes.map(({ angle }, i) => {
-            const nx = Math.sin(angle) * RING_RADIUS;
-            const nz = Math.cos(angle) * RING_RADIUS;
-            const midX = nx * 0.5;
-            const midZ = nz * 0.5;
-            const cp1x = midX + nz * 0.2;
-            const cp1z = midZ - nx * 0.2;
-            return (
-              <NeuralSynapse key={i} x1={0} z1={0} x2={nx} z2={nz}
-                color={neuralNodes[i].color} />
-            );
-          })}
-
+          {/* Central light */}
+          <pointLight intensity={6.0} color={config.glowColor} distance={16} />
         </group>
 
-        {/* ===== NEURAL TERMINAL NODES (8 floating nodes around core) ===== */}
-        {neuralNodes.map(({ angle, color, label, key, isMe }, i) => {
-          const nx = Math.sin(angle) * RING_RADIUS;
-          const nz = Math.cos(angle) * RING_RADIUS;
+        {/* ===== Central Dashboard Screen ===== */}
+        <group position={[0, 1.5, 3.2]} rotation={[-0.2, 0, 0]}>
+          {/* Frame */}
+          <mesh position={[0, 0, -0.06]}>
+            <boxGeometry args={[5.0, 3.0, 0.1]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.1} />
+          </mesh>
+          {/* Screen */}
+          <mesh>
+            <boxGeometry args={[4.7, 2.7, 0.04]} />
+            <meshStandardMaterial color="#000810" roughness={0.05} metalness={0.2} emissive={config.glowColor} emissiveIntensity={0.08} />
+          </mesh>
+          <CoreStatsScreen width={4.4} height={2.4} color={config.glowColor} ocStatus={ocStatus} />
+          {/* Top bar */}
+          <mesh position={[0, 1.4, 0.04]}>
+            <boxGeometry args={[4.4, 0.1, 0.02]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={3.0} />
+          </mesh>
+          {/* Bottom bar */}
+          <mesh position={[0, -1.4, 0.04]}>
+            <boxGeometry args={[4.4, 0.1, 0.02]} />
+            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.5} />
+          </mesh>
+          {/* Side accent bars */}
+          <mesh position={[-2.35, 0, 0.04]}>
+            <boxGeometry args={[0.06, 2.8, 0.02]} />
+            <meshStandardMaterial color="#F472B6" emissive="#F472B6" emissiveIntensity={2.0} />
+          </mesh>
+          <mesh position={[2.35, 0, 0.04]}>
+            <boxGeometry args={[0.06, 2.8, 0.02]} />
+            <meshStandardMaterial color="#A78BFA" emissive="#A78BFA" emissiveIntensity={2.0} />
+          </mesh>
+        </group>
+
+        {/* ===== Organic Connection Tubes (curved) ===== */}
+        {terminals.map(({ x, z, color }, i) => (
+          <OrganicTube key={i} x={x} z={z} color={color} />
+        ))}
+
+        {/* ===== 8 Terminal Stations ===== */}
+        {terminals.map(({ x, z, color, label, key, isMe }, i) => {
           const data = terminalData?.[key];
           const sc = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
           return (
-            <group
-              key={label}
-              ref={el => { nodeRefs.current[i] = el; }}
-              position={[nx, 1.2, nz]}
-            >
-              {/* Node body — icosahedron for organic feel */}
-              <mesh>
-                <icosahedronGeometry args={[isMe ? 0.65 : 0.5, 1]} />
-                <meshStandardMaterial
-                  color="#050f20"
-                  roughness={0.1}
-                  metalness={0.92}
-                  emissive={color}
-                  emissiveIntensity={isMe ? 0.6 : 0.4}
-                />
+            <group key={label} position={[x, 0, z]}>
+              {/* Hexagonal floor pad */}
+              <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[1.1, 6]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} roughness={0.3} metalness={0.7} />
               </mesh>
-              {/* Node inner glow */}
-              <mesh>
-                <sphereGeometry args={[isMe ? 0.3 : 0.22, 12, 12]} />
-                <meshStandardMaterial
-                  color={color}
-                  emissive={color}
-                  emissiveIntensity={2.0}
-                  transparent
-                  opacity={0.7}
-                />
+              {/* Outer ring */}
+              <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.9, 1.15, 6]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} side={THREE.DoubleSide} />
               </mesh>
-              {/* Node point light */}
-              <pointLight intensity={1.2} color={sc} distance={5} />
 
-              {/* Info card — faces inward toward core */}
+              {/* Pillar */}
+              <mesh position={[0, 0.85, 0]}>
+                <cylinderGeometry args={[0.22, 0.28, 1.6, 10]} />
+                <meshStandardMaterial color="#0a1828" roughness={0.2} metalness={0.9} emissive={color} emissiveIntensity={0.1} />
+              </mesh>
+              {/* Mid ring */}
+              <mesh position={[0, 0.85, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.26, 0.045, 8, 24]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} />
+              </mesh>
+
+              {/* Status orb at top */}
+              <mesh position={[0, 1.8, 0]}>
+                <sphereGeometry args={[0.18, 12, 12]} />
+                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={3.0} />
+              </mesh>
+              <pointLight position={[0, 1.8, 0]} intensity={1.5} color={sc} distance={5} />
+
+              {/* Info screen — faces toward center */}
               <group
-                position={[0, 0, 0]}
-                rotation={[0, angle + Math.PI, 0]}
+                ref={el => { nodeRefs.current[i] = el as any; }}
+                position={[0, 1.85, 0]}
+                rotation={[0, Math.atan2(x, z) + Math.PI, 0]}
               >
-                {/* Card background */}
-                <mesh position={[0, 0, isMe ? 0.9 : 0.7]}>
-                  <planeGeometry args={[isMe ? 2.2 : 1.8, isMe ? 1.4 : 1.1]} />
-                  <meshStandardMaterial color="#000c18" roughness={0.1} metalness={0.3} transparent opacity={0.85} />
+                {/* Screen frame */}
+                <mesh position={[0, 0, -0.04]}>
+                  <boxGeometry args={[isMe ? 2.4 : 2.0, isMe ? 1.8 : 1.4, 0.07]} />
+                  <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.15} />
                 </mesh>
-                {/* Card border */}
-                <mesh position={[0, 0, (isMe ? 0.9 : 0.7) - 0.001]}>
-                  <ringGeometry args={[isMe ? 1.0 : 0.8, isMe ? 1.1 : 0.9, 4]} />
-                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} transparent opacity={0.8} />
+                {/* Screen inner */}
+                <mesh position={[0, 0, 0]}>
+                  <boxGeometry args={[isMe ? 2.2 : 1.8, isMe ? 1.6 : 1.2, 0.03]} />
+                  <meshStandardMaterial color="#000810" roughness={0.05} metalness={0.2} />
                 </mesh>
-                <NeuralNodeCard
-                  width={isMe ? 2.0 : 1.5}
-                  height={isMe ? 1.2 : 0.9}
+                <TerminalScreen
+                  width={isMe ? 2.0 : 1.6}
+                  height={isMe ? 1.4 : 1.0}
                   color={color}
                   data={data}
-                  sc={sc}
-                  isMe={isMe}
-                  label={label}
+                  statusColor={sc}
+                  variant={isMe ? 'me' : undefined}
                 />
+                {/* Top bar */}
+                <mesh position={[0, isMe ? 0.75 : 0.65, 0.04]}>
+                  <boxGeometry args={[isMe ? 2.0 : 1.6, 0.1, 0.02]} />
+                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={3.0} />
+                </mesh>
+                {/* Bottom bar */}
+                <mesh position={[0, isMe ? -0.75 : -0.65, 0.04]}>
+                  <boxGeometry args={[isMe ? 2.0 : 1.6, 0.08, 0.02]} />
+                  <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.0} />
+                </mesh>
               </group>
 
-              {/* Floating label on floor below */}
-              <Text position={[0, -0.95, 0]} fontSize={0.22} color={color} anchorX="center" anchorY="middle">
+              {/* Label below */}
+              <Text position={[0, -0.12, 0.7]} fontSize={0.2} color={color} anchorX="center" anchorY="middle">
                 {label}
               </Text>
-              <Text position={[0, -0.95 + 0.28, 0]} fontSize={0.11} color={color} anchorX="center" anchorY="middle" fillOpacity={0.6}>
+              <Text position={[0, -0.12 + 0.28, 0.7]} fontSize={0.11} color={color} anchorX="center" anchorY="middle" fillOpacity={0.55}>
                 {data ? String(data.value1) : '--'} {data?.unit || ''}
               </Text>
             </group>
-          );
-        })}
-
-        {/* ===== Ambient fog particles ===== */}
-        {Array.from({ length: 24 }, (_, i) => {
-          const a = (i / 24) * Math.PI * 2;
-          const r = 3 + (i % 4) * 2;
-          return (
-            <mesh key={i} position={[Math.sin(a) * r, 0.5 + (i % 5) * 0.6, Math.cos(a) * r]}>
-              <sphereGeometry args={[0.025, 4, 4]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} transparent opacity={0.4} />
-            </mesh>
           );
         })}
 

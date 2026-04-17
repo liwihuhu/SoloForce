@@ -1280,11 +1280,7 @@ function MeetingTable({ color }: { color: string }) {
         <cylinderGeometry args={[1.2, 1.2, 0.06, 32]} />
         <meshStandardMaterial color="#0a1828" roughness={0.15} metalness={0.85} emissive={color} emissiveIntensity={0.08} />
       </mesh>
-      {/* 桌面边缘发光条 */}
-      <mesh position={[0, 0.75, 0]}>
-        <torusGeometry args={[1.18, 0.03, 8, 32]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} />
-      </mesh>
+      {/* 桌面 */}
       {/* 桌腿 x4 */}
       {[[0.95, 0, 0.65], [-0.95, 0, 0.65], [0.95, 0, -0.65], [-0.95, 0, -0.65]].map(([x, , z], i) => (
         <mesh key={i} position={[x, 0.37, z]}>

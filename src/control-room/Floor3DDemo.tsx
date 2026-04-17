@@ -1277,16 +1277,16 @@ function MeetingTable({ color }: { color: string }) {
     <group>
       {/* 桌面（椭圆形） */}
       <mesh position={[0, 0.75, 0]}>
-        <cylinderGeometry args={[2.0, 2.0, 0.06, 32]} />
+        <cylinderGeometry args={[1.2, 1.2, 0.06, 32]} />
         <meshStandardMaterial color="#0a1828" roughness={0.15} metalness={0.85} emissive={color} emissiveIntensity={0.08} />
       </mesh>
       {/* 桌面边缘发光条 */}
       <mesh position={[0, 0.75, 0]}>
-        <torusGeometry args={[1.98, 0.03, 8, 32]} />
+        <torusGeometry args={[1.18, 0.03, 8, 32]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} />
       </mesh>
       {/* 桌腿 x4 */}
-      {[[1.6, 0, 1.0], [-1.6, 0, 1.0], [1.6, 0, -1.0], [-1.6, 0, -1.0]].map(([x, , z], i) => (
+      {[[0.95, 0, 0.65], [-0.95, 0, 0.65], [0.95, 0, -0.65], [-0.95, 0, -0.65]].map(([x, , z], i) => (
         <mesh key={i} position={[x, 0.37, z]}>
           <cylinderGeometry args={[0.06, 0.06, 0.74, 8]} />
           <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.9} />
@@ -1294,11 +1294,11 @@ function MeetingTable({ color }: { color: string }) {
       ))}
       {/* 桌下横梁连接 */}
       <mesh position={[0, 0.1, 0]} rotation={[0, 0, 0]}>
-        <boxGeometry args={[3.0, 0.05, 0.05]} />
+        <boxGeometry args={[1.8, 0.05, 0.05]} />
         <meshStandardMaterial color="#0d1f35" roughness={0.3} metalness={0.8} />
       </mesh>
       <mesh position={[0, 0.1, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <boxGeometry args={[2.0, 0.05, 0.05]} />
+        <boxGeometry args={[1.2, 0.05, 0.05]} />
         <meshStandardMaterial color="#0d1f35" roughness={0.3} metalness={0.8} />
       </mesh>
     </group>
@@ -1320,27 +1320,27 @@ function TableSeat({ position, member, onClick }: {
     <group position={position}>
       {/* 椅子底座 */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.45, 20]} />
+        <circleGeometry args={[0.38, 20]} />
         <meshStandardMaterial color={ec} emissive={ec} emissiveIntensity={0.1} transparent opacity={0.4} />
       </mesh>
       {/* 椅子腿 */}
       <mesh position={[0, 0.2, 0]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.4, 8]} />
+        <cylinderGeometry args={[0.035, 0.035, 0.38, 8]} />
         <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.9} />
       </mesh>
       {/* 椅背 */}
       <mesh position={[Math.sin(facingAngle) * 0.35, 0.5, Math.cos(facingAngle) * 0.35]} rotation={[0, facingAngle, 0]}>
-        <boxGeometry args={[0.6, 0.5, 0.06]} />
+        <boxGeometry args={[0.5, 0.45, 0.05]} />
         <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.8} emissive={ec} emissiveIntensity={0.15} />
       </mesh>
       {/* 座位面 */}
       <mesh position={[0, 0.42, 0]}>
-        <boxGeometry args={[0.5, 0.06, 0.5]} />
+        <boxGeometry args={[0.42, 0.05, 0.42]} />
         <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.8} />
       </mesh>
       {/* 名牌底座 */}
       <mesh position={[0, 0.65, 0]} rotation={[-0.2, facingAngle, 0]}>
-        <boxGeometry args={[0.35, 0.25, 0.02]} />
+        <boxGeometry args={[0.28, 0.22, 0.02]} />
         <meshStandardMaterial color={ec} emissive={ec} emissiveIntensity={0.6} roughness={0.2} metalness={0.7} />
       </mesh>
       {/* 状态灯 */}
@@ -1354,7 +1354,7 @@ function TableSeat({ position, member, onClick }: {
         onClick={(e) => { e.stopPropagation(); onClick(member.id); }}
         visible={false}
       >
-        <boxGeometry args={[0.8, 1.0, 0.8]} />
+        <boxGeometry args={[0.6, 0.8, 0.6]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
     </group>
@@ -2079,7 +2079,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
     const screenW = 12, screenH = 5.5;
     // 团队 Hub 布局参数
     const hubRadius = 2.8; // Hub 到成员的半径
-    const hubSpacing = 5.5; // 团队 Hub 之间的间距
+    const hubSpacing = 4.5; // 团队间距（缩小避免重叠）
     const hubY = 0; // Hub 的 y 坐标（地面）
 
     // 稳定的模拟数据（避免每次渲染随机闪烁）
@@ -2128,7 +2128,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
             .filter(Boolean);
           const leader = members.find((m: any) => m.type === 'manager') || members[0];
           const memberCount = members.length;
-          const seatRadius = 2.6;
+          const seatRadius = 1.9;
           const progress = teamProgressMap[team.id]?.progress ?? 0.7;
           const taskCount = teamProgressMap[team.id]?.taskCount ?? 0;
 
@@ -2136,7 +2136,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
             <group key={team.id} position={[tableX, 0, 0]}>  
               {/* 地面团队区域光圈 */}
               <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[3.5, 32]} />
+                <circleGeometry args={[2.4, 32]} />
                 <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.08} transparent opacity={0.45} />
               </mesh>
 

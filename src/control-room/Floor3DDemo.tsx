@@ -2565,26 +2565,26 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
 
           {/* Horizontal timeline bar */}
           <mesh position={[0, 0.5, 0]}>
-            <boxGeometry args={[15.5, 0.08, 0.04]} />
+            <boxGeometry args={[15.0, 0.08, 0.04]} />
             <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.8} />
           </mesh>
 
           {/* NOW end marker */}
-          <mesh position={[7.8, 0.5, 0]}>
+          <mesh position={[7.5, 0.5, 0]}>
             <sphereGeometry args={[0.14, 10, 10]} />
             <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} roughness={0.1} metalness={0.6} />
           </mesh>
-          <Text position={[7.8, 0.85, 0]} fontSize={0.14} color={config.glowColor} anchorX="center" anchorY="bottom">NOW</Text>
+          <Text position={[7.5, 0.85, 0]} fontSize={0.14} color={config.glowColor} anchorX="center" anchorY="bottom">NOW</Text>
 
           {/* Start marker */}
-          <mesh position={[-7.8, 0.5, 0]}>
+          <mesh position={[-7.5, 0.5, 0]}>
             <sphereGeometry args={[0.1, 10, 10]} />
             <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.6} />
           </mesh>
-          <Text position={[-7.8, 0.85, 0]} fontSize={0.14} color={config.glowColor} anchorX="center" anchorY="bottom">6M</Text>
+          <Text position={[-7.5, 0.85, 0]} fontSize={0.14} color={config.glowColor} anchorX="center" anchorY="bottom">6M</Text>
 
-          {/* Month tick marks */}
-          {[-5.5, -3.9, -2.6, -1.3, 0, 1.3, 2.6, 3.9, 5.5, 7.8].map((x, i) => (
+          {/* Month tick marks (evenly spaced) */}
+          {[-6, -4, -2, 0, 2, 4, 6].map((x, i) => (
             <group key={i} position={[x, 0.5, 0]}>
               <mesh>
                 <boxGeometry args={[0.04, 0.3, 0.04]} />
@@ -2596,12 +2596,13 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
             </group>
           ))}
 
-          {/* Task nodes along the timeline */}
+          {/* Task nodes along the timeline (clamped within bar) */}
           {displayTasks.map((task: any, i: number) => {
             const isSelected = selectedTask?.id === task.id;
-            const yOff = (i % 3 - 1) * 0.45;
+            const xClamped = Math.max(-7.2, Math.min(7.2, task.xPos));
+            const yOff = (i % 3 - 1) * 0.42;
             return (
-              <group key={task.id || i} position={[task.xPos, 0.5 + yOff + 0.15, 0]}>
+              <group key={task.id || i} position={[xClamped, 0.5 + yOff + 0.12, 0]}>
                 {/* Connector */}
                 <mesh position={[0, -yOff / 2, 0]}>
                   <boxGeometry args={[0.03, Math.abs(yOff) + 0.1, 0.03]} />
@@ -2631,9 +2632,9 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
 
           {/* Selected task detail card */}
           {selectedTask && (
-            <group position={[0, -1.3, 0]}>
+            <group position={[0, -1.0, 0]}>
               <mesh>
-                <boxGeometry args={[8, 1.2, 0.06]} />
+                <boxGeometry args={[8, 1.0, 0.06]} />
                 <meshStandardMaterial color="#0a1828" roughness={0.2} metalness={0.7} emissive={selectedTask.color} emissiveIntensity={0.15} />
               </mesh>
               <mesh position={[0, 0, 0.04]}>
@@ -2664,9 +2665,9 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
           )}
 
           {/* Legend */}
-          <group position={[6.5, -2.2, 0]}>
+          <group position={[0, -2.1, 0]}>
             {Object.entries(statusColorMap).map(([status, color], i) => (
-              <group key={status} position={[i * 2.5, 0, 0]}>
+              <group key={status} position={[(i - 1) * 3.0, 0, 0]}>
                 <mesh>
                   <sphereGeometry args={[0.09, 8, 8]} />
                   <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.0} roughness={0.2} metalness={0.5} />

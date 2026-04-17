@@ -648,6 +648,31 @@ function EntranceWelcomeScreen({ position, color }: { position: [number, number,
 }
 
 // ===========================================
+// 6F Spaceship — Connection line that follows floating station ref
+function ConnectionLine({ from, to, color, stationRef }: { from: [number,number,number]; to: [number,number,number]; color: string; stationRef: THREE.Group | null }) {
+  const ref = useRef<THREE.Mesh>(null!);
+  useFrame(() => {
+    if (!ref.current) return;
+    const sx = from[0], sy = from[1], sz = from[2];
+    // Endpoint Y follows station float
+    const ey2 = stationRef ? stationRef.position.y + to[1] : to[1];
+    const ex2 = to[0], ez2 = to[2];
+    ref.current.position.set((sx+ex2)/2, (sy+ey2)/2, (sz+ez2)/2);
+    const dx=ex2-sx, dy=ey2-sy, dz=ez2-sz;
+    const len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    ref.current.scale.set(1, len, 1);
+    ref.current.lookAt(ex2, ey2, ez2);
+    ref.current.rotateX(Math.PI/2);
+  });
+  return (
+    <mesh ref={ref}>
+      <cylinderGeometry args={[0.012, 0.012, 1, 4]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} transparent opacity={0.4} roughness={0.3} metalness={0.5} />
+    </mesh>
+  );
+}
+
+// ===========================================
 // 6F Spaceship — Thin connection line from core to station
 function ShipLine({ x, z, color }: { x: number; z: number; color: string }) {
   const geo = useMemo(() => {
@@ -2512,21 +2537,9 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           </mesh>
         </group>
 
-        {/* ======= CONNECTION LINES (thin, clean) ======= */}
+        {/* ======= CONNECTION LINES (follow floating stations) ======= */}
         {stations.map(({ x, z, color }, i) => (
-          <mesh key={i} position={[[0, 2.8, 0], [x, 1.7, z]] as any}>
-            <line>
-              <bufferGeometry>
-                <bufferAttribute
-                  attach="attributes-position"
-                  array={new Float32Array([0, 2.8, 0, x, 1.7, z])}
-                  count={2}
-                  itemSize={3}
-                />
-              </bufferGeometry>
-              <lineBasicMaterial color={color} transparent opacity={0.4} linewidth={1} />
-            </line>
-          </mesh>
+          <ConnectionLine key={i} from={[0, 2.8, 0]} to={[x, 1.7, z]} color={color} stationRef={stationRefs.current[i]} />
         ))}
 
         {/* ======= 8 TERMINAL STATIONS ======= */}

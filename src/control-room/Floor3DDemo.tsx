@@ -648,15 +648,15 @@ function EntranceWelcomeScreen({ position, color }: { position: [number, number,
 }
 
 // ===========================================
-// 6F OpenClaw机房 - 超级大脑核心状态屏
+// 6F OpenClaw机房 - 超级大脑核心状态屏 (大画幅仪表盘)
 function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; height: number; color: string; ocStatus: any }) {
   const meshRef = useRef<THREE.Mesh>(null!);
-  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 256; return c; }, []);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 512; return c; }, []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
 
   const draw = useCallback(() => {
     const ctx = canvas.getContext('2d')!;
-    const W = 512, H = 256;
+    const W = 1024, H = 512;
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#000c1a';
     ctx.fillRect(0, 0, W, H);
@@ -667,53 +667,73 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
     const mem = d.memory || {};
     const ts = d.tasks || {};
     const ss = d.sessions || {};
+    const allOk = gw.reachable;
 
-    // Title
+    // === HEADER ===
     ctx.fillStyle = color;
-    ctx.font = 'bold 14px "SF Mono", monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('OPENCLAW STATUS', 12, 22);
-
-    // Gateway status
-    ctx.fillStyle = gw.reachable ? '#22C55E' : '#EF4444';
-    ctx.font = 'bold 11px "SF Mono", monospace';
-    ctx.fillText(`GATEWAY  ${gw.reachable ? '● ONLINE' : '○ OFFLINE'}  ${gw.latency || 0}ms`, 12, 44);
-
-    // Agents
-    ctx.fillStyle = '#e2e8f0';
-    ctx.font = '11px "SF Mono", monospace';
-    ctx.fillText(`AGENTS    ${ag.count || 0}`, 12, 64);
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10px "SF Mono", monospace';
-    ctx.fillText(`sessions ${ag.sessions || 0}`, 100, 64);
-
-    // Memory
-    ctx.fillStyle = '#4ADE80';
-    ctx.font = '11px "SF Mono", monospace';
-    ctx.fillText(`MEMORY    ${mem.files || 0} files  ${mem.chunks || 0} chunks`, 12, 84);
-
-    // Tasks
-    ctx.fillStyle = '#60A5FA';
-    ctx.font = '11px "SF Mono", monospace';
-    ctx.fillText(`TASKS     active ${ts.active || 0}  queued ${ts.queued || 0}  running ${ts.running || 0}`, 12, 104);
-
-    // Sessions
-    ctx.fillStyle = '#A78BFA';
-    ctx.font = '11px "SF Mono", monospace';
-    ctx.fillText(`SESSIONS  ${ss.active || 0} active`, 12, 124);
-
-    // Tasks tracked
-    ctx.fillStyle = '#FBBF24';
-    ctx.font = '11px "SF Mono", monospace';
-    ctx.fillText(`TRACKED   ${ts.tracked || 0} jobs`, 12, 144);
-
-    // System bar
-    ctx.fillStyle = '#22C55E';
-    ctx.fillRect(0, H - 24, W, 24);
+    ctx.fillRect(0, 0, W, 60);
     ctx.fillStyle = '#000';
-    ctx.font = '11px "SF Mono", monospace';
+    ctx.font = 'bold 28px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('● ALL SYSTEMS OPERATIONAL', W / 2, H - 9);
+    ctx.fillText('OPENCLAW SYSTEM STATUS', W / 2, 40);
+
+    // === BIG STATUS INDICATOR ===
+    const statusX = W - 200;
+    ctx.fillStyle = allOk ? '#22C55E' : '#EF4444';
+    ctx.beginPath();
+    ctx.arc(statusX, 100, 50, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = allOk ? '#000' : '#fff';
+    ctx.font = 'bold 16px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(allOk ? 'ONLINE' : 'OFFLINE', statusX, 96);
+    ctx.fillText(`${gw.latency || 0}ms`, statusX, 116);
+
+    // === 4 BIG KPI CARDS ===
+    const cardW = 210, cardH = 150, gap = 24;
+    const cards = [
+      { label: 'AGENTS', value: ag.count || 0, sub: `${ag.sessions || 0} sessions`, color: '#F472B6' },
+      { label: 'TASKS', value: ts.active || 0, sub: `queued ${ts.queued || 0} | running ${ts.running || 0}`, color: '#60A5FA' },
+      { label: 'MEMORY', value: mem.files || 0, sub: `${mem.chunks || 0} chunks`, color: '#4ADE80' },
+      { label: 'SESSIONS', value: ss.active || 0, sub: `tracked ${ts.tracked || 0} jobs`, color: '#A78BFA' },
+    ];
+    const startX = 40;
+    cards.forEach((card, i) => {
+      const x = startX + i * (cardW + gap);
+      const y = 90;
+      // Card bg
+      ctx.fillStyle = '#0a1828';
+      ctx.strokeStyle = card.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, cardW, cardH, 8);
+      ctx.fill();
+      ctx.stroke();
+      // Color bar top
+      ctx.fillStyle = card.color;
+      ctx.fillRect(x + 4, y + 4, cardW - 8, 5);
+      // Label
+      ctx.fillStyle = card.color;
+      ctx.font = 'bold 14px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(card.label, x + 14, y + 36);
+      // Big value
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 56px "SF Mono", monospace';
+      ctx.fillText(String(card.value), x + 14, y + 108);
+      // Sub
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px "SF Mono", monospace';
+      ctx.fillText(card.sub, x + 14, y + 135);
+    });
+
+    // === BOTTOM BAR ===
+    ctx.fillStyle = '#22C55E';
+    ctx.fillRect(0, H - 44, W, 44);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 16px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('● ALL SYSTEMS OPERATIONAL  ·  REFRESH 5s', W / 2, H - 16);
 
     texture.needsUpdate = true;
   }, [canvas, texture, color, ocStatus]);
@@ -729,60 +749,76 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
 }
 
 // ===========================================
-// 6F OpenClaw机房 - 单个终端数据屏幕
+// 6F OpenClaw机房 - 单个终端数据屏幕 (大画幅)
 function TerminalScreen({ width, height, color, data, statusColor }: { width: number; height: number; color: string; data: any; statusColor: string }) {
   const meshRef = useRef<THREE.Mesh>(null!);
-  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; return c; }, []);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 384; return c; }, []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
 
   const draw = useCallback(() => {
     const ctx = canvas.getContext('2d')!;
-    const W = 256, H = 128;
+    const W = 512, H = 384;
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#000c1a';
     ctx.fillRect(0, 0, W, H);
 
     if (!data) {
       ctx.fillStyle = '#374151';
-      ctx.font = '11px "SF Mono", monospace';
+      ctx.font = 'bold 20px "SF Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillText('CONNECTING...', W / 2, H / 2);
       texture.needsUpdate = true;
       return;
     }
 
-    // Status indicator
+    // Top status bar (thick colored band)
     ctx.fillStyle = statusColor;
-    ctx.fillRect(0, 0, W, 3);
+    ctx.fillRect(0, 0, W, 12);
 
-    // Status label
+    // Status badge (top right)
     ctx.fillStyle = statusColor;
-    ctx.font = 'bold 10px "SF Mono", monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(data.status || 'OFFLINE', W - 8, 16);
+    ctx.beginPath();
+    ctx.roundRect(W - 130, 20, 115, 32, 4);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 14px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(data.status || 'OFFLINE', W - 72, 42);
 
-    // Primary value (big)
+    // BIG main number
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 36px "SF Mono", monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(String(data.value1 || 0), 8, 62);
+    ctx.font = 'bold 120px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(data.value1 || 0), W / 2, 200);
 
-    // Secondary value
+    // Unit below number
+    ctx.fillStyle = color;
+    ctx.font = 'bold 22px "SF Mono", monospace';
+    ctx.fillText(data.unit || '', W / 2, 240);
+
+    // Progress bar background
+    const barW = W - 80;
+    ctx.fillStyle = '#1e3a5f';
+    ctx.beginPath();
+    ctx.roundRect(40, 270, barW, 18, 4);
+    ctx.fill();
+    // Progress bar fill
+    const ratio = data.value2 !== undefined ? data.value1 / (data.value2 || 1) : 1.0;
+    ctx.fillStyle = statusColor;
+    ctx.beginPath();
+    ctx.roundRect(40, 270, barW * Math.min(ratio, 1), 18, 4);
+    ctx.fill();
+
+    // Secondary value + tertiary
     if (data.value2 !== undefined) {
       ctx.fillStyle = color;
-      ctx.font = 'bold 18px "SF Mono", monospace';
-      ctx.fillText(String(data.value2), 8, 88);
+      ctx.font = 'bold 32px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(String(data.value2), 40, 340);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '18px "SF Mono", monospace';
+      ctx.fillText(`+ ${data.value3 !== undefined ? data.value3 : 0} total`, 40 + String(data.value2).length * 28, 340);
     }
-    if (data.value3 !== undefined) {
-      ctx.fillStyle = `${color}aa`;
-      ctx.font = '12px "SF Mono", monospace';
-      ctx.fillText(`/ ${data.value3}`, 50, 88);
-    }
-
-    // Unit
-    ctx.fillStyle = `${color}88`;
-    ctx.font = '10px "SF Mono", monospace';
-    ctx.fillText(data.unit || '', 8, 108);
 
     texture.needsUpdate = true;
   }, [canvas, texture, color, data, statusColor]);
@@ -2190,24 +2226,28 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <pointLight position={[0, 1.5, 0]} intensity={1.5} color={config.glowColor} distance={8} />
           <pointLight position={[0, -1.5, 0]} intensity={1.0} color={config.glowColor} distance={8} />
 
-          {/* Core stats screen */}
-          <group position={[0, 0.3, 1.5]} rotation={[-0.25, 0, 0]}>
-            <mesh position={[0, 0, -0.04]}>
-              <boxGeometry args={[2.2, 1.4, 0.08]} />
+          {/* Core stats screen (BIG) */}
+          <group position={[0, 0.1, 1.8]} rotation={[-0.2, 0, 0]}>
+            {/* Frame */}
+            <mesh position={[0, 0, -0.06]}>
+              <boxGeometry args={[3.6, 2.2, 0.1]} />
               <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
             </mesh>
+            {/* Inner screen */}
             <mesh>
-              <boxGeometry args={[2.0, 1.2, 0.04]} />
-              <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.3} />
+              <boxGeometry args={[3.4, 2.0, 0.05]} />
+              <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.2} />
             </mesh>
-            <CoreStatsScreen width={1.9} height={1.1} color={config.glowColor} ocStatus={ocStatus} />
-            <mesh position={[0, 0.52, 0.04]}>
-              <boxGeometry args={[1.8, 0.12, 0.02]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
+            <CoreStatsScreen width={3.2} height={1.9} color={config.glowColor} ocStatus={ocStatus} />
+            {/* Top bar */}
+            <mesh position={[0, 0.95, 0.04]}>
+              <boxGeometry args={[3.2, 0.14, 0.02]} />
+              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} />
             </mesh>
-            <mesh position={[0, -0.52, 0.04]}>
-              <boxGeometry args={[1.8, 0.08, 0.02]} />
-              <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={1.5} />
+            {/* Bottom bar */}
+            <mesh position={[0, -0.95, 0.04]}>
+              <boxGeometry args={[3.2, 0.1, 0.02]} />
+              <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.0} />
             </mesh>
           </group>
         </group>
@@ -2232,55 +2272,63 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           const statusColor = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
           return (
             <group key={label} position={[x, 0, z]}>
-              {/* Base ring */}
-              <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.6, 0.9, 32]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} side={THREE.DoubleSide} />
+              {/* Base ring (wider) */}
+              <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.7, 1.0, 32]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} side={THREE.DoubleSide} />
               </mesh>
-              <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[0.6, 32]} />
+              <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[0.7, 32]} />
                 <meshStandardMaterial color="#050a18" roughness={0.2} metalness={0.9} emissive={color} emissiveIntensity={0.1} />
               </mesh>
-              {/* Terminal body */}
-              <mesh position={[0, 0.4, 0]}>
-                <cylinderGeometry args={[0.55, 0.65, 0.7, 16]} />
+              {/* Tall pillar */}
+              <mesh position={[0, 1.0, 0]}>
+                <cylinderGeometry args={[0.3, 0.4, 2.0, 12]} />
                 <meshStandardMaterial color="#080f20" roughness={0.15} metalness={0.9} emissive={color} emissiveIntensity={0.1} />
               </mesh>
-              {/* Status light */}
-              <mesh position={[0, 0.78, 0]}>
-                <sphereGeometry args={[0.18, 12, 12]} />
-                <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={2.0} />
+              {/* Middle ring on pillar */}
+              <mesh position={[0, 1.0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.35, 0.04, 8, 24]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} />
               </mesh>
-              <pointLight position={[0, 0.8, 0]} intensity={0.8} color={statusColor} distance={3} />
+              {/* Status light (top of pillar) */}
+              <mesh position={[0, 2.05, 0]}>
+                <sphereGeometry args={[0.2, 12, 12]} />
+                <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={2.5} />
+              </mesh>
+              <pointLight position={[0, 2.1, 0]} intensity={1.2} color={statusColor} distance={4} />
               {/* Receiver ring */}
-              <mesh position={[0, 0.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.5, 0.03, 8, 24]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.0} />
+              <mesh position={[0, 2.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.4, 0.04, 8, 24]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} />
               </mesh>
 
-              {/* Terminal screen with data */}
-              <mesh position={[0, 1.05, 0.3]} rotation={[0.3, 0, 0]}>
-                <boxGeometry args={[0.04, 0.4, 0.04]} />
+              {/* Terminal screen with data (BIG) */}
+              {/* Support arm */}
+              <mesh position={[0, 1.6, 0.5]} rotation={[0.4, 0, 0]}>
+                <boxGeometry args={[0.06, 1.5, 0.06]} />
                 <meshStandardMaterial color="#1a2a4a" roughness={0.3} metalness={0.8} />
               </mesh>
-              <mesh position={[0, 1.3, 0.38]} rotation={[0.3, 0, 0]}>
-                <boxGeometry args={[0.85, 0.55, 0.04]} />
+              {/* Screen frame */}
+              <mesh position={[0, 2.5, 0.9]} rotation={[0.35, 0, 0]}>
+                <boxGeometry args={[2.2, 1.6, 0.08]} />
                 <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
               </mesh>
-              <TerminalScreen width={0.76} height={0.46} color={color} data={data} statusColor={statusColor} />
-              <mesh position={[0, 1.53, 0.41]} rotation={[0.3, 0, 0]}>
-                <boxGeometry args={[0.65, 0.08, 0.01]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.0} />
+              {/* Screen inner */}
+              <mesh position={[0, 2.5, 0.94]} rotation={[0.35, 0, 0]}>
+                <boxGeometry args={[2.0, 1.4, 0.04]} />
+                <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={color} emissiveIntensity={0.15} />
               </mesh>
-              {[0.12, 0.0, -0.12].map((dy, li) => (
-                <mesh key={li} position={[0, 1.3 + dy, 0.41]} rotation={[0.3, 0, 0]}>
-                  <boxGeometry args={[0.55, 0.04, 0.01]} />
-                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6 - li * 0.15} />
-                </mesh>
-              ))}
-              <mesh position={[0, 1.18, 0.41]} rotation={[0.3, 0, 0]}>
-                <boxGeometry args={[0.65, 0.06, 0.01]} />
-                <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.0} />
+              <TerminalScreen width={1.9} height={1.3} color={color} data={data} statusColor={statusColor} />
+              {/* Top bar */}
+              <mesh position={[0, 3.16, 0.94]} rotation={[0.35, 0, 0]}>
+                <boxGeometry args={[1.8, 0.12, 0.02]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} />
+              </mesh>
+              {/* Bottom bar */}
+              <mesh position={[0, 1.86, 0.94]} rotation={[0.35, 0, 0]}>
+                <boxGeometry args={[1.8, 0.1, 0.02]} />
+                <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.5} />
               </mesh>
 
               {/* Label */}

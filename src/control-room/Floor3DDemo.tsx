@@ -2728,24 +2728,43 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
           <Text position={[0, -0.85, 0.42]} fontSize={0.1} color="#94a3b8" anchorX="center" anchorY="middle">CIRCLE = 85%</Text>
         </group>
 
-        {/* ===== Tiered seating (3 rows facing wall) ===== */}
-        {[0, 1, 2].map((row) => {
-          const rowZ = 1.5 + row * 1.4;
-          const rowY = row * 0.35;
-          const seats = row === 0 ? [-5, -2.5, 0, 2.5, 5] : row === 1 ? [-5.5, -2, 0, 2, 5.5] : [-6, -1.5, 0, 1.5, 6];
-          return seats.map((x, si) => (
-            <group key={`${row}-${si}`} position={[x, rowY, rowZ]}>
-              <mesh position={[0, 0.45, 0]}>
-                <boxGeometry args={[1.1, 0.06, 0.7]} />
-                <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={config.glowColor} emissiveIntensity={row === 0 ? 0.08 : 0.04} />
-              </mesh>
-              <mesh position={[0, 0.45, -0.38]}>
-                <boxGeometry args={[1.1, 0.8, 0.06]} />
-                <meshStandardMaterial color="#111e2e" roughness={0.3} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.05} />
-              </mesh>
-            </group>
-          ));
-        })}
+        {/* ===== Archive cabinets (3 rows facing wall) ===== */}
+        {[-1, 0, 1].map((row) =>
+          [-5, -2.5, 0, 2.5, 5].map((x, ci) => {
+            const cabinetColor = (row + ci) % 2 === 0 ? '#0f2a1a' : '#0f1e2a';
+            const statusColor = ci % 5 === 0 ? '#22C55E' : ci % 5 === 1 ? '#FBBF24' : ci % 5 === 2 ? '#60A5FA' : ci % 5 === 3 ? '#A78BFA' : '#34D399';
+            const zPos = row * 1.4 + 1.5;
+            return (
+              <group key={`cab-${row}-${ci}`} position={[x, 0, zPos]}>
+                {/* Cabinet body */}
+                <mesh position={[0, 1.1, 0]} castShadow receiveShadow>
+                  <boxGeometry args={[1.4, 2.2, 0.5]} />
+                  <meshStandardMaterial color={cabinetColor} roughness={0.4} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.1} />
+                </mesh>
+                {/* Drawer dividers */}
+                {[0.55, 1.1, 1.65].map((y, li) => (
+                  <mesh key={li} position={[0, y, 0.26]}>
+                    <boxGeometry args={[1.38, 0.015, 0.01]} />
+                    <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.4} />
+                  </mesh>
+                ))}
+                {/* Drawer handles */}
+                {[0.55, 1.1, 1.65].map((y, li) => (
+                  <mesh key={li} position={[0, y, 0.27]}>
+                    <boxGeometry args={[0.35, 0.05, 0.04]} />
+                    <meshStandardMaterial color={statusColor} roughness={0.3} metalness={0.8} />
+                  </mesh>
+                ))}
+                {/* Top status light */}
+                <mesh position={[0, 2.22, 0]}>
+                  <sphereGeometry args={[0.06, 8, 8]} />
+                  <meshStandardMaterial color={statusColor} roughness={0.2} metalness={0.8} emissive={statusColor} emissiveIntensity={0.8} />
+                </mesh>
+                <pointLight position={[0, 2.2, 0]} intensity={0.3} color={statusColor} distance={1.5} />
+              </group>
+            );
+          })
+        )
 
         {/* Ambient Lighting */}
         <pointLight position={[0, 4, 0]} intensity={1.5} color={config.glowColor} distance={18} />

@@ -2079,7 +2079,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
     const screenW = 12, screenH = 5.5;
     // 团队 Hub 布局参数
     const hubRadius = 2.8; // Hub 到成员的半径
-    const hubSpacing = 4.5; // 团队间距（缩小避免重叠）
+    const hubSpacing = 6.0; // 团队间距（缩小避免重叠）
     const hubY = 0; // Hub 的 y 坐标（地面）
 
     // 稳定的模拟数据（避免每次渲染随机闪烁）

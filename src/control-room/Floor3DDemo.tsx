@@ -2497,15 +2497,15 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
 }
 
   if (floorId === '5f') {
-    // Fetch task history
     const [taskHistory, setTaskHistory] = useState<any[]>([]);
+    const [selectedTask, setSelectedTask] = useState<any>(null);
 
     useEffect(() => {
       if (floorId !== '5f') return;
       let cancelled = false;
       (async () => {
         try {
-          const res = await fetch('http://localhost:5301/api/task-history?page=1&pageSize=30').then(r => r.json()).catch(() => ({ success: false, data: [] }));
+          const res = await fetch('http://localhost:5301/api/task-history?page=1&pageSize=30').then(r => r.json()).catch(() => ({ success: false, data: { items: [] } }));
           if (!cancelled && res.success) {
             setTaskHistory(res.data.items || []);
           }
@@ -2514,31 +2514,27 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
       return () => { cancelled = true; };
     }, [floorId]);
 
-    // Stable display data (avoid re-random on every render)
+    const statusColorMap: Record<string, string> = {
+      completed: '#22C55E',
+      failed: '#EF4444',
+      in_progress: '#FBBF24',
+    };
+
     const displayTasks = useMemo(() => {
       if (taskHistory.length === 0) return [];
       const now = Date.now();
       const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
       return taskHistory
         .filter((t: any) => new Date(t.createdAt || now).getTime() > sixMonthsAgo)
-        .slice(0, 24)
+        .slice(0, 20)
         .map((t: any) => {
-          const createdAt = new Date(t.createdAt || now);
-          const position = (createdAt.getTime() - sixMonthsAgo) / (now - sixMonthsAgo); // 0~1
-          const xPos = (position - 0.5) * 14; // -7 to +7
-          const above = Math.random() > 0.5;
+          const ts = new Date(t.createdAt || now).getTime();
+          const xPos = ((ts - sixMonthsAgo) / (now - sixMonthsAgo) - 0.5) * 15;
           const status = t.status || 'completed';
-          const color = status === 'completed' ? '#22C55E' : status === 'failed' ? '#EF4444' : '#FBBF24';
-          return { ...t, xPos, above, color, createdAt };
+          const color = statusColorMap[status] || '#A3E635';
+          return { ...t, xPos, color, ts };
         });
     }, [taskHistory]);
-
-    // Status color map
-    const statusColorMap: Record<string, string> = {
-      completed: '#22C55E',
-      failed: '#EF4444',
-      in_progress: '#FBBF24',
-    };
 
     return (
       <group position={[0, -floorIndex * FLOOR_HEIGHT, 0]}>
@@ -2549,172 +2545,220 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
         </mesh>
         <gridHelper args={[20, 30, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.1} transparent />
 
-        {/* ===== Timeline Axis ===== */}
-        {/* Main horizontal glowing bar */}
-        <mesh position={[0, 0.9, 0]} rotation={[0, 0, 0]}>
-          <cylinderGeometry args={[0.05, 0.05, 14.5, 12]} />
-          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.8} />
-        </mesh>
+        {/* ===== BACK WALL - Full-width history timeline ===== */}
+        <group position={[0, 2.8, -5.5]}>
+          {/* Wall background */}
+          <mesh position={[0, 0, -0.1]}>
+            <boxGeometry args={[17, 5.5, 0.2]} />
+            <meshStandardMaterial color="#060e1a" roughness={0.3} metalness={0.6} />
+          </mesh>
+          {/* Top border */}
+          <mesh position={[0, 2.6, 0]}>
+            <boxGeometry args={[17, 0.12, 0.08]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
+          </mesh>
 
-        {/* Timeline glow sphere at center */}
-        <mesh position={[0, 0.9, 0]}>
-          <sphereGeometry args={[0.12, 12, 12]} />
-          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} roughness={0.1} metalness={0.6} />
-        </mesh>
+          {/* Main title */}
+          <Text position={[0, 2.2, 0]} fontSize={0.32} color={config.glowColor} anchorX="center" anchorY="middle">
+            TASK HISTORY TIMELINE
+          </Text>
 
-        {/* Month tick marks along timeline */}
-        {[-6, -4, -2, 0, 2, 4, 6].map((x) => (
-          <group key={x} position={[x, 0.9, 0]}>
-            {/* Tick mark */}
-            <mesh>
-              <cylinderGeometry args={[0.03, 0.03, 0.35, 8]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.0} roughness={0.2} metalness={0.7} />
-            </mesh>
-            {/* Label */}
-            <Text position={[0, 0.38, 0]} fontSize={0.18} color={config.glowColor} anchorX="center" anchorY="middle" font={undefined}>
-              {x === -6 ? '6M' : x === -4 ? '5M' : x === -2 ? '4M' : x === 0 ? '3M' : x === 2 ? '2M' : x === 4 ? '1M' : 'NOW'}
-            </Text>
-          </group>
-        ))}
+          {/* Horizontal timeline bar */}
+          <mesh position={[0, 0.5, 0]}>
+            <boxGeometry args={[15.5, 0.08, 0.04]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.8} />
+          </mesh>
 
-        {/* Left end cap */}
-        <mesh position={[-7.3, 0.9, 0]}>
-          <sphereGeometry args={[0.1, 10, 10]} />
-          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.6} />
-        </mesh>
-        {/* Right end cap (NOW) */}
-        <mesh position={[7.3, 0.9, 0]}>
-          <sphereGeometry args={[0.15, 10, 10]} />
-          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} roughness={0.1} metalness={0.6} />
-        </mesh>
+          {/* NOW end marker */}
+          <mesh position={[7.8, 0.5, 0]}>
+            <sphereGeometry args={[0.14, 10, 10]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} roughness={0.1} metalness={0.6} />
+          </mesh>
+          <Text position={[7.8, 0.85, 0]} fontSize={0.14} color={config.glowColor} anchorX="center" anchorY="bottom">NOW</Text>
 
-        {/* ===== Task History Nodes ===== */}
-        {displayTasks.map((task: any, i: number) => (
-          <group key={task.id || i} position={[task.xPos, 0.9, 0]}>
-            {/* Vertical stem connecting to timeline */}
-            <mesh position={[0, task.above ? 0.5 : -0.5, 0]}>
-              <cylinderGeometry args={[0.015, 0.015, 1.0, 6]} />
-              <meshStandardMaterial color={task.color} emissive={task.color} emissiveIntensity={0.6} roughness={0.3} metalness={0.5} transparent opacity={0.7} />
-            </mesh>
-            {/* Task node sphere */}
-            <mesh position={[0, task.above ? 1.0 : -1.0, 0]}>
-              <sphereGeometry args={[0.1, 10, 10]} />
-              <meshStandardMaterial color={task.color} emissive={task.color} emissiveIntensity={1.8} roughness={0.2} metalness={0.5} />
-            </mesh>
-            {/* Point light for glow */}
-            <pointLight position={[0, task.above ? 1.0 : -1.0, 0]} intensity={0.5} color={task.color} distance={2} />
-          </group>
-        ))}
+          {/* Start marker */}
+          <mesh position={[-7.8, 0.5, 0]}>
+            <sphereGeometry args={[0.1, 10, 10]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.6} />
+          </mesh>
+          <Text position={[-7.8, 0.85, 0]} fontSize={0.14} color={config.glowColor} anchorX="center" anchorY="bottom">6M</Text>
 
-        {/* ===== Legend ===== */}
-        <group position={[6.5, 2.5, -4.5]}>
-          {Object.entries(statusColorMap).map(([status, color], i) => (
-            <group key={status} position={[0, -i * 0.5, 0]}>
+          {/* Month tick marks */}
+          {[-5.5, -3.9, -2.6, -1.3, 0, 1.3, 2.6, 3.9, 5.5, 7.8].map((x, i) => (
+            <group key={i} position={[x, 0.5, 0]}>
               <mesh>
-                <sphereGeometry args={[0.08, 8, 8]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} roughness={0.2} metalness={0.5} />
+                <boxGeometry args={[0.04, 0.3, 0.04]} />
+                <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.0} roughness={0.2} metalness={0.7} />
               </mesh>
-              <Text position={[0.2, 0, 0]} fontSize={0.14} color={color} anchorX="left" anchorY="middle">
-                {status === 'completed' ? 'COMPLETED' : status === 'failed' ? 'FAILED' : 'IN PROGRESS'}
+              <Text position={[0, -0.28, 0]} fontSize={0.12} color={`${config.glowColor}aa`} anchorX="center" anchorY="top">
+                {i === 0 ? '5M' : i === 1 ? '4M' : i === 2 ? '3M' : i === 3 ? '2M' : i === 4 ? '1M' : ''}
               </Text>
             </group>
           ))}
-        </group>
 
-        {/* ===== Side Statistics Screens ===== */}
-        {/* Left screen - history stats */}
-        <group position={[-7.5, 2.8, -4.2]}>
-          <mesh>
-            <boxGeometry args={[3.5, 2.5, 0.1]} />
-            <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} />
-          </mesh>
-          <TaskHistoryStatScreen width={3.3} height={2.3} color={config.glowColor} side="left" />
-          <mesh position={[0, 1.18, 0.06]}>
-            <boxGeometry args={[3.1, 0.14, 0.02]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
-          </mesh>
-          <pointLight position={[0, 0, 1]} intensity={0.6} color={config.glowColor} distance={4} />
-        </group>
+          {/* Task nodes along the timeline */}
+          {displayTasks.map((task: any, i: number) => {
+            const isSelected = selectedTask?.id === task.id;
+            const yOff = (i % 3 - 1) * 0.45;
+            return (
+              <group key={task.id || i} position={[task.xPos, 0.5 + yOff + 0.15, 0]}>
+                {/* Connector */}
+                <mesh position={[0, -yOff / 2, 0]}>
+                  <boxGeometry args={[0.03, Math.abs(yOff) + 0.1, 0.03]} />
+                  <meshStandardMaterial color={task.color} emissive={task.color} emissiveIntensity={0.6} transparent opacity={0.6} />
+                </mesh>
+                {/* Node sphere */}
+                <mesh
+                  onClick={() => setSelectedTask(isSelected ? null : task)}
+                  onPointerOver={() => { document.body.style.cursor = 'pointer'; }}
+                  onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+                >
+                  <sphereGeometry args={[isSelected ? 0.18 : 0.1, 10, 10]} />
+                  <meshStandardMaterial
+                    color={task.color}
+                    emissive={task.color}
+                    emissiveIntensity={isSelected ? 3.0 : 1.5}
+                    roughness={0.2}
+                    metalness={0.5}
+                  />
+                </mesh>
+                {isSelected && (
+                  <pointLight position={[0, 0, 0.5]} intensity={1.2} color={task.color} distance={3} />
+                )}
+              </group>
+            );
+          })}
 
-        {/* Right screen - history stats */}
-        <group position={[7.5, 2.8, -4.2]}>
-          <mesh>
-            <boxGeometry args={[3.5, 2.5, 0.1]} />
-            <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} />
-          </mesh>
-          <TaskHistoryStatScreen width={3.3} height={2.3} color={config.glowColor} side="right" />
-          <mesh position={[0, 1.18, 0.06]}>
-            <boxGeometry args={[3.1, 0.14, 0.02]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
-          </mesh>
-          <pointLight position={[0, 0, 1]} intensity={0.6} color={config.glowColor} distance={4} />
-        </group>
+          {/* Selected task detail card */}
+          {selectedTask && (
+            <group position={[0, -1.3, 0]}>
+              <mesh>
+                <boxGeometry args={[8, 1.2, 0.06]} />
+                <meshStandardMaterial color="#0a1828" roughness={0.2} metalness={0.7} emissive={selectedTask.color} emissiveIntensity={0.15} />
+              </mesh>
+              <mesh position={[0, 0, 0.04]}>
+                <boxGeometry args={[7.8, 1.1, 0.02]} />
+                <meshStandardMaterial color="#000c1a" roughness={0.1} metalness={0.3} />
+              </mesh>
+              {/* Status badge */}
+              <mesh position={[-3.4, 0.38, 0.06]}>
+                <boxGeometry args={[1.6, 0.28, 0.02]} />
+                <meshStandardMaterial color={selectedTask.color} emissive={selectedTask.color} emissiveIntensity={1.5} roughness={0.2} metalness={0.5} />
+              </mesh>
+              <Text position={[-3.4, 0.38, 0.08]} fontSize={0.12} color="#000" anchorX="center" anchorY="middle">
+                {String(selectedTask.status || 'completed').toUpperCase()}
+              </Text>
+              <Text position={[0, 0.28, 0.08]} fontSize={0.15} color="#fff" anchorX="center" anchorY="middle">
+                {selectedTask.taskId || `Task-${selectedTask.id?.slice(0, 8) || '?'}`}
+              </Text>
+              <Text position={[0, 0.0, 0.08]} fontSize={0.11} color={`${config.glowColor}cc`} anchorX="center" anchorY="middle">
+                {selectedTask.createdAt ? new Date(selectedTask.createdAt).toLocaleString() : 'Unknown time'}
+              </Text>
+              {selectedTask.agentId && (
+                <Text position={[0, -0.22, 0.08]} fontSize={0.1} color="#94a3b8" anchorX="center" anchorY="middle">
+                  AGENT: {selectedTask.agentId}
+                </Text>
+              )}
+              <Text position={[3.5, 0.38, 0.08]} fontSize={0.09} color="#475569" anchorX="right" anchorY="middle">click to close</Text>
+            </group>
+          )}
 
-        {/* ===== Arc Seating (audience facing timeline) ===== */}
-        {/* Front row */}
-        {[-4, -2, 0, 2, 4].map((x, i) => (
-          <group key={`front-${i}`} position={[x, 0, 3.5]}>
-            <mesh position={[0, 0.45, 0]}>
-              <boxGeometry args={[1.2, 0.06, 0.7]} />
-              <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.06} />
-            </mesh>
-            <mesh position={[0, 0.45, -0.4]}>
-              <boxGeometry args={[1.2, 0.9, 0.06]} />
-              <meshStandardMaterial color="#152238" roughness={0.3} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.05} />
-            </mesh>
+          {/* Legend */}
+          <group position={[6.5, -2.2, 0]}>
+            {Object.entries(statusColorMap).map(([status, color], i) => (
+              <group key={status} position={[i * 2.5, 0, 0]}>
+                <mesh>
+                  <sphereGeometry args={[0.09, 8, 8]} />
+                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.0} roughness={0.2} metalness={0.5} />
+                </mesh>
+                <Text position={[0.2, 0, 0]} fontSize={0.12} color={color} anchorX="left" anchorY="middle">
+                  {status === 'completed' ? 'DONE' : status === 'failed' ? 'FAIL' : 'ACTIVE'}
+                </Text>
+              </group>
+            ))}
           </group>
-        ))}
-        {/* Back row */}
-        {[-5, -2.5, 0, 2.5, 5].map((x, i) => (
-          <group key={`back-${i}`} position={[x, 0, 4.8]}>
-            <mesh position={[0, 0.45, 0]}>
-              <boxGeometry args={[1.2, 0.06, 0.7]} />
-              <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.06} />
-            </mesh>
-            <mesh position={[0, 0.45, -0.4]}>
-              <boxGeometry args={[1.2, 0.9, 0.06]} />
-              <meshStandardMaterial color="#152238" roughness={0.3} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.05} />
-            </mesh>
-          </group>
-        ))}
 
-        {/* ===== Retrieval Podium at Center ===== */}
-        <group position={[0, 0, 1.5]}>
-          {/* Podium base */}
-          <mesh position={[0, 0.55, 0]}>
-            <boxGeometry args={[1.8, 1.1, 0.9]} />
-            <meshStandardMaterial color="#0f1e2a" roughness={0.25} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.1} />
-          </mesh>
-          {/* Screen */}
-          <mesh position={[0, 0.6, 0.46]}>
-            <boxGeometry args={[1.5, 0.8, 0.03]} />
-            <meshStandardMaterial color="#001018" roughness={0.1} metalness={0.4} emissive={config.glowColor} emissiveIntensity={0.4} />
-          </mesh>
-          {/* Top glow bar */}
-          <mesh position={[0, 1.1, 0]}>
-            <boxGeometry args={[1.6, 0.06, 0.06]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
-          </mesh>
-          {/* Base glow ring */}
-          <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.8, 1.0, 32]} />
-            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} side={THREE.DoubleSide} transparent opacity={0.6} />
-          </mesh>
-          <pointLight position={[0, 1.0, 0]} intensity={1.0} color={config.glowColor} distance={4} />
+          {/* Back wall lighting */}
+          <pointLight position={[-6, 0, 2]} intensity={0.8} color={config.glowColor} distance={8} />
+          <pointLight position={[6, 0, 2]} intensity={0.8} color={config.glowColor} distance={8} />
+          <pointLight position={[0, 3, 1]} intensity={0.6} color={config.glowColor} distance={8} />
         </group>
 
-        {/* ===== Ambient Lighting ===== */}
+        {/* ===== Statistics pillars (left and right) ===== */}
+        {/* Left pillar */}
+        <group position={[-8, 2.2, -4.0]}>
+          <mesh>
+            <boxGeometry args={[1.8, 4.5, 0.8]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.08} />
+          </mesh>
+          <Text position={[0, 2.0, 0.42]} fontSize={0.18} color={config.glowColor} anchorX="center" anchorY="middle">TASKS</Text>
+          <Text position={[0, 1.65, 0.42]} fontSize={0.11} color={`${config.glowColor}88`} anchorX="center" anchorY="middle">ALL TIME</Text>
+          {[-0.5, 0, 0.5].map((x, i) => {
+            const heights = [1.8, 2.5, 1.2];
+            return (
+              <mesh key={i} position={[x, -0.3, 0.42]}>
+                <boxGeometry args={[0.35, heights[i], 0.05]} />
+                <meshStandardMaterial color={[config.glowColor, '#22C55E', '#EF4444'][i]} emissive={[config.glowColor, '#22C55E', '#EF4444'][i]} emissiveIntensity={0.8} roughness={0.2} metalness={0.6} />
+              </mesh>
+            );
+          })}
+          <Text position={[-0.5, -1.05, 0.42]} fontSize={0.1} color={config.glowColor} anchorX="center" anchorY="middle">ALL</Text>
+          <Text position={[0, -1.05, 0.42]} fontSize={0.1} color="#22C55E" anchorX="center" anchorY="middle">DONE</Text>
+          <Text position={[0.5, -1.05, 0.42]} fontSize={0.1} color="#EF4444" anchorX="center" anchorY="middle">FAIL</Text>
+        </group>
+
+        {/* Right pillar - rate */}
+        <group position={[8, 2.2, -4.0]}>
+          <mesh>
+            <boxGeometry args={[1.8, 4.5, 0.8]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} emissive={config.glowColor} emissiveIntensity={0.08} />
+          </mesh>
+          <Text position={[0, 2.0, 0.42]} fontSize={0.18} color={config.glowColor} anchorX="center" anchorY="middle">RATE</Text>
+          <Text position={[0, 1.65, 0.42]} fontSize={0.11} color={`${config.glowColor}88`} anchorX="center" anchorY="middle">SUCCESS</Text>
+          {/* Circular progress ring */}
+          <mesh position={[0, 0.3, 0.42]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.9, 0.08, 8, 32]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.5} roughness={0.2} metalness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.3, 0.42]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.9, 0.06, 8, 32, Math.PI * 1.25]} />
+            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.0} roughness={0.1} metalness={0.5} />
+          </mesh>
+          <Text position={[0, 0.3, 0.46]} fontSize={0.28} color="#22C55E" anchorX="center" anchorY="middle">85%</Text>
+          <Text position={[0, -0.85, 0.42]} fontSize={0.1} color="#94a3b8" anchorX="center" anchorY="middle">CIRCLE = 85%</Text>
+        </group>
+
+        {/* ===== Tiered seating (3 rows facing wall) ===== */}
+        {[0, 1, 2].map((row) => {
+          const rowZ = 1.5 + row * 1.4;
+          const rowY = row * 0.35;
+          const seats = row === 0 ? [-5, -2.5, 0, 2.5, 5] : row === 1 ? [-5.5, -2, 0, 2, 5.5] : [-6, -1.5, 0, 1.5, 6];
+          return seats.map((x, si) => (
+            <group key={`${row}-${si}`} position={[x, rowY, rowZ]}>
+              <mesh position={[0, 0.45, 0]}>
+                <boxGeometry args={[1.1, 0.06, 0.7]} />
+                <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={config.glowColor} emissiveIntensity={row === 0 ? 0.08 : 0.04} />
+              </mesh>
+              <mesh position={[0, 0.45, -0.38]}>
+                <boxGeometry args={[1.1, 0.8, 0.06]} />
+                <meshStandardMaterial color="#111e2e" roughness={0.3} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.05} />
+              </mesh>
+            </group>
+          ));
+        })}
+
+        {/* Ambient Lighting */}
         <pointLight position={[0, 4, 0]} intensity={1.5} color={config.glowColor} distance={18} />
         <rectAreaLight position={[0, 4, 0]} rotation={[-Math.PI / 2, 0, 0]} width={20} height={12} intensity={0.8} color={config.glowColor} />
-        <pointLight position={[-7, 2, 0]} intensity={0.5} color={config.glowColor} distance={8} />
-        <pointLight position={[7, 2, 0]} intensity={0.5} color={config.glowColor} distance={8} />
-        <pointLight position={[0, 2, 4]} intensity={0.4} color={config.glowColor} distance={6} />
+        <pointLight position={[-6, 2, 0]} intensity={0.5} color={config.glowColor} distance={8} />
+        <pointLight position={[6, 2, 0]} intensity={0.5} color={config.glowColor} distance={8} />
       </group>
     );
   }
 
 
-  // 默认办公室布局
+
+// 默认办公室布局
   return (
     <group position={[0, -floorIndex * FLOOR_HEIGHT, 0]}>
       <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>

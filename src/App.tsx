@@ -394,7 +394,7 @@ function MainView() {
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { reloadEmployees, reloadTeams, teams, currentTeamId, switchTeam } = useTopologyStore();
+  const { reloadEmployees, reloadTeams, teams, currentTeamId, switchTeam, setSelectedEmployee } = useTopologyStore();
 
   const currentPage = location.pathname;
 
@@ -405,6 +405,20 @@ export default function App() {
       reloadEmployees();
     }
   }, [location.pathname, currentTeamId]);
+
+  // 监听 3D 楼层点击员工，跳转到员工详情
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { employeeId } = (e as CustomEvent).detail;
+      navigate('/employees');
+      // 延迟设置选中员工，确保页面已切换
+      setTimeout(() => {
+        setSelectedEmployee(employeeId);
+      }, 100);
+    };
+    window.addEventListener('navigate-to-employee', handler);
+    return () => window.removeEventListener('navigate-to-employee', handler);
+  }, [navigate, setSelectedEmployee]);
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw' }}>

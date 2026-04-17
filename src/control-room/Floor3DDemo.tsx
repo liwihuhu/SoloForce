@@ -2154,8 +2154,14 @@ function Floor3DScene({ floorId }: { floorId: string }) {
   }
 
 
+  
   if (floorId === '6f') {
-    // Fetch OpenClaw system status
+    // ================================================================
+    // 6F OPENCLAW ENGINE ROOM — Redrawn Layout
+    // Camera: [8, 6, 8] in world space → [8, -12, 8] in 6F-local
+    // Layout: Core podium center, terminals ring r=4.5, main screen front
+    // ================================================================
+
     const [ocStatus, setOcStatus] = useState<any>(null);
 
     useEffect(() => {
@@ -2163,8 +2169,8 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       let cancelled = false;
       const fetchStatus = async () => {
         try {
-          const res = await fetch('http://localhost:5301/api/openclaw-status').then(r => r.json()).catch(() => ({ success: false }));
-          if (!cancelled && res.success) setOcStatus(res.data);
+          const res = await fetch('http://localhost:5301/api/openclaw-status').then(r => r.json()).catch(() => null);
+          if (!cancelled && res?.success) setOcStatus(res.data);
         } catch (_) {}
       };
       fetchStatus();
@@ -2172,226 +2178,231 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       return () => { cancelled = true; clearInterval(iv); };
     }, [floorId]);
 
-    // Terminal data mapping
+    // Terminal data
     const terminalData = useMemo(() => {
       if (!ocStatus) return null;
       const d = ocStatus;
       return {
-        AGENTS: { value1: d.agents?.count ?? 1, value2: d.agents?.sessions ?? 2, status: 'ONLINE', unit: 'agents' },
-        TASKS: { value1: d.tasks?.active ?? 0, value2: d.tasks?.running ?? 0, value3: d.tasks?.tracked ?? 8, status: d.tasks?.active > 0 ? 'ACTIVE' : 'IDLE', unit: 'tasks' },
+        ME:      { value1: 1, value2: d.sessions?.active ?? 2, value3: d.memory?.files ?? 65, status: 'ONLINE',  unit: 'bot' },
+        AGENTS:  { value1: d.agents?.count ?? 1, value2: d.agents?.sessions ?? 2, status: 'ONLINE',  unit: 'agents' },
         GATEWAY: { value1: d.gateway?.latency ?? 0, status: d.gateway?.reachable ? 'CONNECTED' : 'OFFLINE', unit: 'ms' },
-        MEMORY: { value1: d.memory?.files ?? 65, value2: d.memory?.chunks ?? 366, status: 'ACTIVE', unit: 'entries' },
-        SESSIONS: { value1: d.sessions?.active ?? 2, status: 'LIVE', unit: 'sessions' },
-        SKILLS: { value1: 12, value2: 8, status: 'LOADED', unit: 'skills' },
-        MCP: { value1: 4, value2: 12, status: 'READY', unit: 'tools' },
-        SCHEDULE: { value1: d.tasks?.tracked ?? 8, status: 'RUNNING', unit: 'jobs' },
-        ME: { value1: 1, value2: d.sessions?.active ?? 2, value3: d.memory?.files ?? 65, status: 'ONLINE', unit: 'sessions' },
+        TASKS:   { value1: d.tasks?.active ?? 0, value2: d.tasks?.running ?? 0, value3: d.tasks?.tracked ?? 8, status: d.tasks?.active > 0 ? 'ACTIVE' : 'IDLE', unit: 'tasks' },
+        MEMORY:  { value1: d.memory?.files ?? 65, value2: d.memory?.chunks ?? 366, status: 'ACTIVE',  unit: 'files' },
+        SESSIONS:{ value1: d.sessions?.active ?? 2, status: 'LIVE',  unit: 'sessions' },
+        SKILLS:  { value1: 12, value2: 8, status: 'LOADED', unit: 'skills' },
+        MCP:     { value1: 4, value2: 12, status: 'READY',  unit: 'tools' },
       };
     }, [ocStatus]);
 
-    // Core breathing ref
+    // Core breathing
     const coreRef = useRef<THREE.Mesh>(null!);
     useFrame(({ clock }) => {
       if (!coreRef.current) return;
       const t = clock.getElapsedTime();
-      const breathe = Math.sin(t * 1.5) * 0.06 + 1.0;
-      coreRef.current.scale.setScalar(breathe);
+      const b = Math.sin(t * 1.5) * 0.06 + 1.0;
+      coreRef.current.scale.setScalar(b);
     });
 
     const statusColorMap: Record<string, string> = {
       ONLINE: '#22C55E', OFFLINE: '#EF4444', CONNECTED: '#22C55E',
       IDLE: '#FBBF24', ACTIVE: '#60A5FA', LIVE: '#22C55E',
-      LOADED: '#22C55E', READY: '#22C55E', RUNNING: '#60A5FA',
-      '@ME': '#E879F9',
+      LOADED: '#22C55E', READY: '#22C55E',
     };
 
+    // 8 terminals: ring at r=4.5, front-row facing camera, back-row facing away
     const terminals = [
-      { x:  5.5, z:  0,   color: '#F472B6', label: 'AGENTS',   key: 'AGENTS' },
-      { x:  0,   z:  5.5, color: '#60A5FA', label: 'TASKS',    key: 'TASKS' },
-      { x: -5.5, z:  0,   color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS' },
-      { x:  0,   z: -5.5, color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY' },
-      { x:  3.9, z:  3.9, color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY' },
-      { x: -3.9, z:  3.9, color: '#34D399', label: 'MCP',      key: 'MCP' },
-      { x:  3.9, z: -3.9, color: '#E879F9', label: 'ME',       key: 'ME' },
-      { x: -3.9, z: -3.9, color: '#38BDF8', label: 'SCHEDULE', key: 'SCHEDULE' },
+      { x:  0,    z: -4.5, color: '#E879F9', label: 'ME',       key: 'ME',      ry: 0        },
+      { x: -4.5, z:  0,   color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  ry: Math.PI / 2 },
+      { x:  4.5, z:  0,   color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY', ry: -Math.PI / 2 },
+      { x:  0,   z:  4.5, color: '#60A5FA', label: 'TASKS',    key: 'TASKS',   ry: Math.PI },
+      { x: -3.2, z: -3.2, color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY',  ry: Math.PI * 0.25 },
+      { x:  3.2, z: -3.2, color: '#38BDF8', label: 'SESSIONS', key: 'SESSIONS', ry: -Math.PI * 0.25 },
+      { x: -3.2, z:  3.2, color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS',  ry: Math.PI * 0.75 },
+      { x:  3.2, z:  3.2, color: '#FB923C', label: 'MCP',      key: 'MCP',     ry: -Math.PI * 0.75 },
     ];
+
+    // Soft tube from terminal top to core top (y=1.6)
+    const tubeFrom = (x: number, z: number) => [x, 1.8, z];
+    const tubeTo   = [0, 1.6, 0];
 
     return (
       <group position={[0, -floorIndex * FLOOR_HEIGHT, 0]}>
-        {/* Floor */}
-        <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[16, 12]} />
+
+        {/* ===== Floor ===== */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[18, 14]} />
           <meshStandardMaterial color={config.floorColor} roughness={0.2} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.06} />
         </mesh>
-        <gridHelper args={[16, 24, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.25} transparent />
+        <gridHelper args={[18, 36, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.2} transparent />
 
-        {/* ===== Super Brain Core (breathing animation) ===== */}
-        <group position={[0, 4.0, 0]}>
-          {/* Outer orbit rings x3 */}
-          {[0, Math.PI / 3, Math.PI / 3 * 2].map((rot, i) => (
-            <mesh key={i} rotation={[rot, 0, 0]}>
-              <torusGeometry args={[2.2, 0.03, 8, 64]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.0} transparent opacity={0.5} />
-            </mesh>
-          ))}
+        {/* ===== Ambient lights ===== */}
+        <pointLight position={[0, 5, 0]} intensity={2.0} color={config.glowColor} distance={20} />
+        <pointLight position={[0, 3, 3]} intensity={1.0} color={'#F472B6'} distance={10} />
+        <pointLight position={[0, 3, -3]} intensity={1.0} color={'#60A5FA'} distance={10} />
 
-          {/* Main brain sphere with breathing ref */}
-          <mesh ref={coreRef}>
-            <sphereGeometry args={[1.4, 32, 32]} />
-            <meshStandardMaterial color="#000818" roughness={0.05} metalness={0.95} emissive={config.glowColor} emissiveIntensity={0.4} />
+        {/* ===== Central Core Podium ===== */}
+        {/* Hexagonal base platform */}
+        <mesh position={[0, 0.15, 0]}>
+          <cylinderGeometry args={[1.8, 2.0, 0.3, 6]} />
+          <meshStandardMaterial color="#0a1828" roughness={0.2} metalness={0.9} emissive={config.glowColor} emissiveIntensity={0.15} />
+        </mesh>
+        {/* Hex ring on base */}
+        <mesh position={[0, 0.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.9, 0.05, 8, 6]} />
+          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
+        </mesh>
+        {/* Core column */}
+        <mesh position={[0, 1.0, 0]}>
+          <cylinderGeometry args={[0.5, 0.6, 1.4, 12]} />
+          <meshStandardMaterial color="#080f20" roughness={0.15} metalness={0.95} emissive={config.glowColor} emissiveIntensity={0.1} />
+        </mesh>
+        {/* Column glow ring mid */}
+        <mesh position={[0, 1.0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.55, 0.05, 8, 24]} />
+          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} />
+        </mesh>
+
+        {/* Orbit rings around column top */}
+        {[0, Math.PI / 3, Math.PI / 3 * 2].map((rot, i) => (
+          <mesh key={i} position={[0, 1.6, 0]} rotation={[rot, 0, 0]}>
+            <torusGeometry args={[1.2, 0.03, 8, 48]} />
+            <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={1.2} transparent opacity={0.6} />
           </mesh>
+        ))}
 
-          {/* Brain grid lines */}
-          {[-0.7, 0, 0.7].map((y, i) => (
-            <mesh key={i} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[1.39, 0.015, 4, 32]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} transparent opacity={0.6} />
-            </mesh>
-          ))}
+        {/* Brain sphere (breathing) */}
+        <mesh ref={coreRef} position={[0, 2.35, 0]}>
+          <sphereGeometry args={[0.85, 32, 32]} />
+          <meshStandardMaterial color="#000818" roughness={0.05} metalness={0.95} emissive={config.glowColor} emissiveIntensity={0.5} />
+        </mesh>
+        {/* Inner core glow */}
+        <mesh position={[0, 2.35, 0]}>
+          <sphereGeometry args={[0.35, 16, 16]} />
+          <meshStandardMaterial color="#001830" roughness={0.0} metalness={1.0} emissive={config.glowColor} emissiveIntensity={3.0} />
+        </mesh>
+        {/* Top spire */}
+        <mesh position={[0, 3.3, 0]}>
+          <coneGeometry args={[0.1, 0.4, 8]} />
+          <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={3.0} />
+        </mesh>
+        {/* Core lights */}
+        <pointLight position={[0, 2.35, 0]} intensity={4.0} color={config.glowColor} distance={12} />
+        <pointLight position={[0, 3.5, 0]} intensity={2.0} color={config.glowColor} distance={8} />
 
-          {/* Inner core */}
+        {/* ===== Main Dashboard Screen (front center, eye level) ===== */}
+        {/* Pedestal */}
+        <mesh position={[0, 0.7, 2.6]}>
+          <boxGeometry args={[0.3, 1.4, 0.3]} />
+          <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.8} emissive={config.glowColor} emissiveIntensity={0.1} />
+        </mesh>
+        {/* Screen frame */}
+        <group position={[0, 1.8, 2.8]} rotation={[-0.25, 0, 0]}>
+          <mesh position={[0, 0, -0.06]}>
+            <boxGeometry args={[4.4, 2.6, 0.1]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+          </mesh>
+          {/* Inner dark panel */}
           <mesh>
-            <sphereGeometry args={[0.5, 16, 16]} />
-            <meshStandardMaterial color="#001830" roughness={0.0} metalness={1.0} emissive={config.glowColor} emissiveIntensity={1.5} />
+            <boxGeometry args={[4.1, 2.3, 0.04]} />
+            <meshStandardMaterial color="#000810" roughness={0.05} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.1} />
           </mesh>
-
-          {/* Inner energy rings */}
-          {[[0, 0], [0, Math.PI / 2]].map(([rx, ry], i) => (
-            <mesh key={i} rotation={[rx, 0, ry]}>
-              <torusGeometry args={[0.7, 0.05, 8, 32]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.0} />
-            </mesh>
-          ))}
-
-          {/* Top spire */}
-          <mesh position={[0, 1.45, 0]}>
-            <coneGeometry args={[0.15, 0.5, 8]} />
+          {/* Canvas screen */}
+          <CoreStatsScreen width={3.8} height={2.0} color={config.glowColor} ocStatus={ocStatus} />
+          {/* Top glow bar */}
+          <mesh position={[0, 1.2, 0.04]}>
+            <boxGeometry args={[3.8, 0.1, 0.02]} />
             <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={3.0} />
           </mesh>
-
-          {/* Core lights */}
-          <pointLight position={[0, 0, 0]} intensity={3.0} color={config.glowColor} distance={12} />
-          <pointLight position={[0, 1.5, 0]} intensity={1.5} color={config.glowColor} distance={8} />
-          <pointLight position={[0, -1.5, 0]} intensity={1.0} color={config.glowColor} distance={8} />
-
-          {/* Core stats screen (BIG) */}
-          <group position={[0, 0.1, 1.8]} rotation={[-0.2, 0, 0]}>
-            {/* Frame */}
-            <mesh position={[0, 0, -0.06]}>
-              <boxGeometry args={[3.6, 2.2, 0.1]} />
-              <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
-            </mesh>
-            {/* Inner screen */}
-            <mesh>
-              <boxGeometry args={[3.4, 2.0, 0.05]} />
-              <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.2} />
-            </mesh>
-            <CoreStatsScreen width={3.2} height={1.9} color={config.glowColor} ocStatus={ocStatus} />
-            {/* Top bar */}
-            <mesh position={[0, 0.95, 0.04]}>
-              <boxGeometry args={[3.2, 0.14, 0.02]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} />
-            </mesh>
-            {/* Bottom bar */}
-            <mesh position={[0, -0.95, 0.04]}>
-              <boxGeometry args={[3.2, 0.1, 0.02]} />
-              <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.0} />
-            </mesh>
-          </group>
+          {/* Bottom status bar */}
+          <mesh position={[0, -1.2, 0.04]}>
+            <boxGeometry args={[3.8, 0.1, 0.02]} />
+            <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.5} />
+          </mesh>
         </group>
 
         {/* ===== SoftTube Connections ===== */}
-        {[
-          { x:  5.5, z:  0,   color: '#F472B6' },
-          { x:  0,   z:  5.5, color: '#60A5FA' },
-          { x: -5.5, z:  0,   color: '#FBBF24' },
-          { x:  0,   z: -5.5, color: '#A78BFA' },
-          { x:  3.9, z:  3.9, color: '#4ADE80' },
-          { x: -3.9, z:  3.9, color: '#34D399' },
-          { x:  3.9, z: -3.9, color: '#FB923C' },
-          { x: -3.9, z: -3.9, color: '#38BDF8' },
-        ].map(({ x, z, color }, i) => (
+        {terminals.map(({ x, z, color }, i) => (
           <SoftTube key={i} x={x} z={z} color={color} />
         ))}
 
-        {/* ===== 8 Terminal Stations with Real Data ===== */}
-        {terminals.map(({ x, z, color, label, key }) => {
+        {/* ===== 8 Terminal Pods ===== */}
+        {terminals.map(({ x, z, color, label, key, ry }) => {
           const data = terminalData?.[key];
-          const statusColor = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
+          const sc = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
+          const isMe = key === 'ME';
           return (
             <group key={label} position={[x, 0, z]}>
-              {/* Base ring (wider) */}
+              {/* Floor base disc */}
+              <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[0.85, 32]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.2} metalness={0.8} />
+              </mesh>
+              {/* Base ring */}
               <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[0.7, 1.0, 32]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} side={THREE.DoubleSide} />
-              </mesh>
-              <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <circleGeometry args={[0.7, 32]} />
-                <meshStandardMaterial color="#050a18" roughness={0.2} metalness={0.9} emissive={color} emissiveIntensity={0.1} />
-              </mesh>
-              {/* Tall pillar */}
-              <mesh position={[0, 1.0, 0]}>
-                <cylinderGeometry args={[0.3, 0.4, 2.0, 12]} />
-                <meshStandardMaterial color="#080f20" roughness={0.15} metalness={0.9} emissive={color} emissiveIntensity={0.1} />
-              </mesh>
-              {/* Middle ring on pillar */}
-              <mesh position={[0, 1.0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.35, 0.04, 8, 24]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} />
-              </mesh>
-              {/* Status light (top of pillar) */}
-              <mesh position={[0, 2.05, 0]}>
-                <sphereGeometry args={[0.2, 12, 12]} />
-                <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={2.5} />
-              </mesh>
-              <pointLight position={[0, 2.1, 0]} intensity={1.2} color={statusColor} distance={4} />
-              {/* Receiver ring */}
-              <mesh position={[0, 2.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <torusGeometry args={[0.4, 0.04, 8, 24]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} />
+                <ringGeometry args={[0.7, 0.95, 32]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.0} side={THREE.DoubleSide} />
               </mesh>
 
-              {/* Terminal screen with data (BIG) */}
-              {/* Support arm */}
-              <mesh position={[0, 1.6, 0.5]} rotation={[0.4, 0, 0]}>
-                <boxGeometry args={[0.06, 1.5, 0.06]} />
-                <meshStandardMaterial color="#1a2a4a" roughness={0.3} metalness={0.8} />
+              {/* Pillar */}
+              <mesh position={[0, 0.9, 0]}>
+                <cylinderGeometry args={[0.18, 0.24, 1.6, 10]} />
+                <meshStandardMaterial color="#080f20" roughness={0.15} metalness={0.9} emissive={color} emissiveIntensity={0.08} />
               </mesh>
-              {/* Screen frame */}
-              <mesh position={[0, 2.5, 0.9]} rotation={[0.35, 0, 0]}>
-                <boxGeometry args={[2.2, 1.6, 0.08]} />
-                <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+              {/* Mid ring */}
+              <mesh position={[0, 0.9, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.22, 0.04, 8, 20]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.0} />
               </mesh>
-              {/* Screen inner */}
-              <mesh position={[0, 2.5, 0.94]} rotation={[0.35, 0, 0]}>
-                <boxGeometry args={[2.0, 1.4, 0.04]} />
-                <meshStandardMaterial color="#001018" roughness={0.05} metalness={0.3} emissive={color} emissiveIntensity={0.15} />
+              {/* Status light */}
+              <mesh position={[0, 1.8, 0]}>
+                <sphereGeometry args={[0.14, 10, 10]} />
+                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={3.0} />
               </mesh>
-              <TerminalScreen width={1.9} height={1.3} color={color} data={data} statusColor={statusColor} variant={key === 'ME' ? 'me' : undefined} />
-              {/* Top bar */}
-              <mesh position={[0, 3.16, 0.94]} rotation={[0.35, 0, 0]}>
-                <boxGeometry args={[1.8, 0.12, 0.02]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} />
-              </mesh>
-              {/* Bottom bar */}
-              <mesh position={[0, 1.86, 0.94]} rotation={[0.35, 0, 0]}>
-                <boxGeometry args={[1.8, 0.1, 0.02]} />
-                <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={1.5} />
-              </mesh>
+              <pointLight position={[0, 1.8, 0]} intensity={1.5} color={sc} distance={4} />
 
-              {/* Label */}
-              <Text position={[0, -0.15, 0.55]} fontSize={0.15} color={color} anchorX="center" anchorY="middle">
+              {/* Screen — rotated to face center (ry + π so screen faces inward) */}
+              <group position={[0, 1.85, 0]} rotation={[0, ry + Math.PI, 0]}>
+                {/* Screen frame */}
+                <mesh position={[0, 0, -0.04]}>
+                  <boxGeometry args={[isMe ? 2.4 : 1.9, isMe ? 1.8 : 1.3, 0.07]} />
+                  <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.12} />
+                </mesh>
+                {/* Inner */}
+                <mesh position={[0, 0, 0]}>
+                  <boxGeometry args={[isMe ? 2.2 : 1.7, isMe ? 1.6 : 1.1, 0.03]} />
+                  <meshStandardMaterial color="#000810" roughness={0.05} metalness={0.2} />
+                </mesh>
+                <TerminalScreen
+                  width={isMe ? 2.0 : 1.5}
+                  height={isMe ? 1.4 : 0.95}
+                  color={color}
+                  data={data}
+                  statusColor={sc}
+                  variant={isMe ? 'me' : undefined}
+                />
+                {/* Top bar */}
+                <mesh position={[0, isMe ? 0.85 : 0.6, 0.02]}>
+                  <boxGeometry args={[isMe ? 2.0 : 1.5, 0.09, 0.02]} />
+                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} />
+                </mesh>
+                {/* Bottom bar */}
+                <mesh position={[0, isMe ? -0.85 : -0.6, 0.02]}>
+                  <boxGeometry args={[isMe ? 2.0 : 1.5, 0.08, 0.02]} />
+                  <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={1.5} />
+                </mesh>
+              </group>
+
+              {/* Floor label */}
+              <Text position={[0, -0.08, 0.6]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
                 {label}
+              </Text>
+              <Text position={[0, -0.08, 0.42]} fontSize={0.1} color={color} anchorX="center" anchorY="middle" fillOpacity={0.6}>
+                {data ? String(data.value1) : '--'} {data?.unit || ''}
               </Text>
             </group>
           );
         })}
 
-        {/* Ambient lighting */}
-        <pointLight position={[0, 4.0, 0]} intensity={2.0} color={config.glowColor} distance={18} />
-        <rectAreaLight position={[0, 5.0, 0]} rotation={[-Math.PI / 2, 0, 0]} width={16} height={12} intensity={1.2} color={config.glowColor} />
-        <pointLight position={[-6, 2, 0]} intensity={0.6} color={config.glowColor} distance={8} />
-        <pointLight position={[6, 2, 0]} intensity={0.6} color={config.glowColor} distance={8} />
       </group>
     );
   }

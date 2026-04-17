@@ -2152,7 +2152,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
         <gridHelper args={[16, 24, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.25} transparent />
 
         {/* ===== Super Brain Core (breathing animation) ===== */}
-        <group position={[0, 2.5, 0]}>
+        <group position={[0, 4.0, 0]}>
           {/* Outer orbit rings x3 */}
           {[0, Math.PI / 3, Math.PI / 3 * 2].map((rot, i) => (
             <mesh key={i} rotation={[rot, 0, 0]}>

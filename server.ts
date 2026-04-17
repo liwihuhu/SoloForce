@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { execSync, execFileSync, spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -323,11 +323,16 @@ loadSavedRelationships();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// ========== OpenClaw 系统状态 API ==========
+// ========== OpenClaw 系统状态 API (带缓存) ==========
+let ocStatusCache: { data: any; ts: number } = { data: null, ts: 0 };
+const OC_CACHE_TTL = 10000; // 10秒缓存
 
 function parseOpenClawStatus(output: string) {
+  // 处理 UTF-8 box-drawing 和 middle-dot 字符
   const clean = output
     .replace(/[│┌┐└┘├┤┬┴┼─━]/g, ' ')
+    .replace(/·/g, ' ')
+    .replace(/[^\x20-\x7E\t\n\r]/g, '')
     .replace(/\s+/g, ' ').trim();
 
   const data = {
@@ -341,6 +346,8 @@ function parseOpenClawStatus(output: string) {
   const gm = clean.match(/reachable\s+(\d+)ms/);
   if (gm) { data.gateway.reachable = true; data.gateway.latency = parseInt(gm[1]); }
 
+
+  // Agents: "Agents 1 · 1 bootstrap file present · sessions 2"
   const am = clean.match(/Agents\s+(\d+).*?sessions\s+(\d+)/);
   if (am) { data.agents.count = parseInt(am[1]); data.agents.sessions = parseInt(am[2]); }
 
@@ -357,17 +364,46 @@ function parseOpenClawStatus(output: string) {
   const sm = clean.match(/Sessions\s+(\d+)\s+active/);
   if (sm) data.sessions.active = parseInt(sm[1]);
 
+
   return data;
 }
 
 app.get('/api/openclaw-status', (req, res) => {
-  try {
-    const output = execSync('/opt/homebrew/bin/openclaw status 2>/dev/null', { timeout: 8000 });
-    const data = parseOpenClawStatus(output.toString());
-    res.json({ success: true, data });
-  } catch (e: any) {
-    res.json({ success: false, error: e.message });
+  const now = Date.now();
+  if (ocStatusCache.data && (now - ocStatusCache.ts) < OC_CACHE_TTL) {
+    res.json({ success: true, data: ocStatusCache.data, cached: true });
+    return;
   }
+  // 使用 spawn 异步执行避免阻塞
+  const p = spawn('/opt/homebrew/bin/openclaw', ['status'], { timeout: 20000 });
+  let out = '';
+  p.stdout.on('data', d => out += d.toString());
+  p.on('close', (code) => {
+    if (code === 0 && out.length > 0) {
+      const data = parseOpenClawStatus(out);
+      ocStatusCache = { data, ts: now };
+      res.json({ success: true, data });
+    } else if (ocStatusCache.data) {
+      res.json({ success: true, data: ocStatusCache.data, stale: true });
+    } else {
+      res.json({ success: false, error: 'command failed' });
+    }
+  });
+  p.on('error', (e) => {
+    if (ocStatusCache.data) {
+      res.json({ success: true, data: ocStatusCache.data, stale: true });
+    } else {
+      res.json({ success: false, error: e.message });
+    }
+  });
+  // 20秒超时保底
+  setTimeout(() => {
+    p.kill();
+    if (!res.headersSent) {
+      if (ocStatusCache.data) res.json({ success: true, data: ocStatusCache.data, stale: true });
+      else res.status(504).json({ success: false, error: 'timeout' });
+    }
+  }, 20000);
 });
 
 // ========== 员工管理 API ==========

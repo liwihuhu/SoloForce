@@ -2729,8 +2729,8 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
         </group>
 
         {/* ===== Archive cabinets (3 rows facing wall) ===== */}
-        {[-1, 0, 1].map((row) =>
-          [-5, -2.5, 0, 2.5, 5].map((x, ci) => {
+        {[-1, 0, 1].map((row) => {
+          return [-5, -2.5, 0, 2.5, 5].map((x, ci) => {
             const cabinetColor = (row + ci) % 2 === 0 ? '#0f2a1a' : '#0f1e2a';
             const statusColor = ci % 5 === 0 ? '#22C55E' : ci % 5 === 1 ? '#FBBF24' : ci % 5 === 2 ? '#60A5FA' : ci % 5 === 3 ? '#A78BFA' : '#34D399';
             const zPos = row * 1.4 + 1.5;
@@ -2763,8 +2763,8 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
                 <pointLight position={[0, 2.2, 0]} intensity={0.3} color={statusColor} distance={1.5} />
               </group>
             );
-          })
-        )
+          })}
+        )}
 
         {/* Ambient Lighting */}
         <pointLight position={[0, 4, 0]} intensity={1.5} color={config.glowColor} distance={18} />

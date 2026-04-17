@@ -3,6 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -321,6 +322,53 @@ loadSavedRelationships();
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// ========== OpenClaw 系统状态 API ==========
+
+function parseOpenClawStatus(output: string) {
+  const clean = output
+    .replace(/[│┌┐└┘├┤┬┴┼─━]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+
+  const data = {
+    gateway: { reachable: false, latency: null },
+    agents: { count: 0, sessions: 0 },
+    memory: { files: 0, chunks: 0 },
+    tasks: { active: 0, queued: 0, running: 0, tracked: 0 },
+    sessions: { active: 0 },
+  };
+
+  const gm = clean.match(/reachable\s+(\d+)ms/);
+  if (gm) { data.gateway.reachable = true; data.gateway.latency = parseInt(gm[1]); }
+
+  const am = clean.match(/Agents\s+(\d+).*?sessions\s+(\d+)/);
+  if (am) { data.agents.count = parseInt(am[1]); data.agents.sessions = parseInt(am[2]); }
+
+  const fm = clean.match(/(\d+)\s+files/);
+  const cm = clean.match(/(\d+)\s+chunks/);
+  if (fm) data.memory.files = parseInt(fm[1]);
+  if (cm) data.memory.chunks = parseInt(cm[1]);
+
+  const tm = clean.match(/(\d+)\s+active.*?(\d+)\s+queued.*?(\d+)\s+running/);
+  if (tm) { data.tasks.active = parseInt(tm[1]); data.tasks.queued = parseInt(tm[2]); data.tasks.running = parseInt(tm[3]); }
+  const trm = clean.match(/(\d+)\s+tracked/);
+  if (trm) data.tasks.tracked = parseInt(trm[1]);
+
+  const sm = clean.match(/Sessions\s+(\d+)\s+active/);
+  if (sm) data.sessions.active = parseInt(sm[1]);
+
+  return data;
+}
+
+app.get('/api/openclaw-status', (req, res) => {
+  try {
+    const output = execSync('/opt/homebrew/bin/openclaw status 2>/dev/null', { timeout: 8000 });
+    const data = parseOpenClawStatus(output.toString());
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.json({ success: false, error: e.message });
+  }
+});
 
 // ========== 员工管理 API ==========
 

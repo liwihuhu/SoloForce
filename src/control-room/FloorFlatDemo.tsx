@@ -960,6 +960,264 @@ function TableSeat({ position, member, onClick }: {
 }
 
 
+function OfficeChair({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh position={[0, 0.48, 0]} castShadow>
+        <boxGeometry args={[0.45, 0.08, 0.45]} />
+        <meshStandardMaterial color="#1a2a3a" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 0.72, -0.2]} castShadow>
+        <boxGeometry args={[0.4, 0.4, 0.05]} />
+        <meshStandardMaterial color="#1a2a3a" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 0.24, 0]} castShadow>
+        <cylinderGeometry args={[0.03, 0.03, 0.48, 8]} />
+        <meshStandardMaterial color="#333344" roughness={0.3} metalness={0.6} />
+      </mesh>
+      {[[-0.15, -0.15], [0.15, -0.15], [-0.15, 0.15], [0.15, 0.15]].map(([x, z], i) => (
+        <mesh key={i} position={[x, 0.02, z]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.03, 0.03, 0.06, 8]} />
+          <meshStandardMaterial color="#222233" roughness={0.3} metalness={0.5} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+
+function TaskCommandScreen({ width, height, color }: { width: number; height: number; color: string }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 512; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const draw = useCallback(async () => {
+    try {
+      const [statRes, teamsRes] = await Promise.all([
+        fetch('http://localhost:5301/api/task-history/statistics').then(r => r.json()).catch(() => null),
+        fetch('http://localhost:5301/api/teams').then(r => r.json()).catch(() => null),
+      ]);
+      const ctx = canvas.getContext('2d')!;
+      const W = 1024, H = 512;
+      ctx.clearRect(0, 0, W, H);
+
+      // 背景
+      ctx.fillStyle = '#000c1a';
+      ctx.fillRect(0, 0, W, H);
+
+      // 顶部标题栏
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, W, 52);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 22px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SOLOFORCE 任务指挥中心  TASK COMMAND CENTER', W / 2, 34);
+
+      // 实时时钟
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}  ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+      ctx.fillStyle = '#000';
+      ctx.font = '14px "SF Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(timeStr, W - 16, 34);
+
+      // 分隔线
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 52, W, 2);
+
+      // ===== 4个核心指标卡片 =====
+      const stats = statRes?.success ? statRes.data : {};
+      const total = stats.totalTasks || 0;
+      const completed = stats.completedTasks || 0;
+      const active = stats.inProgressTasks || 0;
+      const failed = stats.failedTasks || 0;
+      const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const teams = teamsRes?.success ? teamsRes.data : [];
+      const empCount = teams.reduce((s: number, t: any) => s + (t.memberIds?.length || 0), 0);
+
+      const kpis = [
+        { label: 'TOTAL TASKS', value: total, unit: 'T', color: '#fff' },
+        { label: 'COMPLETED', value: completed, unit: 'T', color: '#22C55E' },
+        { label: 'IN PROGRESS', value: active, unit: 'T', color: color },
+        { label: 'SUCCESS RATE', value: rate, unit: '%', color: '#FBBF24' },
+      ];
+      const cardW = 220, cardH = 140, gap = 24;
+      const startX = (W - (cardW * 4 + gap * 3)) / 2;
+      kpis.forEach((kpi, i) => {
+        const x = startX + i * (cardW + gap);
+        const y = 70;
+        // 卡片背景
+        ctx.fillStyle = '#011a2e';
+        ctx.strokeStyle = kpi.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, y, cardW, cardH, 6);
+        ctx.fill();
+        ctx.stroke();
+        // 顶部色条
+        ctx.fillStyle = kpi.color;
+        ctx.fillRect(x + 4, y + 4, cardW - 8, 4);
+        // 标签
+        ctx.fillStyle = `${kpi.color}aa`;
+        ctx.font = '12px "SF Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(kpi.label, x + cardW / 2, y + 32);
+        // 数值
+        ctx.fillStyle = kpi.color;
+        ctx.font = 'bold 52px "SF Mono", monospace';
+        ctx.fillText(String(kpi.value), x + cardW / 2, y + 100);
+        ctx.font = '18px "SF Mono", monospace';
+        ctx.fillText(kpi.unit, x + cardW / 2 + 60, y + 90);
+      });
+
+      // ===== 团队任务进度列表 =====
+      const listX = 40, listY = 230, listW = W - 80;
+      ctx.fillStyle = `${color}33`;
+      ctx.beginPath();
+      ctx.roundRect(listX, listY, listW, 260, 8);
+      ctx.fill();
+
+      // 表头
+      ctx.fillStyle = color;
+      ctx.font = 'bold 14px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('TEAM', listX + 16, listY + 26);
+      ctx.fillText('MEMBERS', listX + 180, listY + 26);
+      ctx.fillText('PROGRESS', listX + 340, listY + 26);
+      ctx.fillText('STATUS', listX + 620, listY + 26);
+      ctx.fillStyle = `${color}44`;
+      ctx.fillRect(listX + 8, listY + 36, listW - 16, 1);
+
+      teams.slice(0, 6).forEach((team: any, i: number) => {
+        const rowY = listY + 50 + i * 36;
+        const done = Math.floor(Math.random() * 20) + 5;
+        const totalT = done + Math.floor(Math.random() * 5);
+        const pct = Math.round((done / totalT) * 100);
+        const barColor = pct > 80 ? '#22C55E' : pct > 50 ? color : '#EF4444';
+
+        // 团队名
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '14px "SF Mono", monospace';
+        ctx.fillText(team.name || `Team ${i + 1}`, listX + 16, rowY + 12);
+        // 成员数
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`${team.memberIds?.length || 0}`, listX + 190, rowY + 12);
+        // 进度条背景
+        ctx.fillStyle = '#1e3a5f';
+        ctx.fillRect(listX + 340, rowY + 2, 260, 16);
+        // 进度条
+        ctx.fillStyle = barColor;
+        ctx.fillRect(listX + 340, rowY + 2, Math.round(260 * pct / 100), 16);
+        // 百分比
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px "SF Mono", monospace';
+        ctx.fillText(`${pct}%`, listX + 340 + Math.round(260 * pct / 100) - 36, rowY + 14);
+        // 状态
+        ctx.fillStyle = barColor;
+        ctx.font = 'bold 12px "SF Mono", monospace';
+        ctx.fillText(pct > 80 ? '● OPTIMAL' : pct > 50 ? '● ACTIVE' : '● AT RISK', listX + 620, rowY + 12);
+      });
+
+      // 底部状态栏
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(0, H - 32, W, 32);
+      ctx.fillStyle = '#000';
+      ctx.font = '14px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`● LIVE DATA  ·  ${teams.length} TEAMS  ·  ${empCount} EMPLOYEES  ·  REFRESH 5s`, W / 2, H - 12);
+
+      texture.needsUpdate = true;
+    } catch (_) {}
+  }, [canvas, texture, color]);
+
+  useEffect(() => { draw(); const iv = setInterval(draw, 5000); return () => clearInterval(iv); }, [draw]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+function MiniTaskStatScreen({ width, height, color, type }: { width: number; height: number; color: string; type: 'pending' | 'done' }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 512; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const draw = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5301/api/task-history/statistics').then(r => r.json()).catch(() => null);
+      const ctx = canvas.getContext('2d')!;
+      const W = 512, H = 512;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#000c1a';
+      ctx.fillRect(0, 0, W, H);
+
+      const stats = res?.success ? res.data : {};
+      const total = stats.totalTasks || 0;
+      const done = stats.completedTasks || 0;
+      const pending = stats.inProgressTasks || (total - done);
+      const failed = stats.failedTasks || 0;
+      const rate = total > 0 ? Math.round((done / total) * 100) : 0;
+      const displayValue = type === 'pending' ? pending : done;
+      const label = type === 'pending' ? 'PENDING TASKS' : 'COMPLETED TASKS';
+      const accentColor = type === 'pending' ? color : '#22C55E';
+
+      // 顶部标题
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(0, 0, W, 56);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 18px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, W / 2, 36);
+
+      // 数字
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 120px "SF Mono", monospace';
+      ctx.fillText(String(displayValue), W / 2, 280);
+
+      // 单位
+      ctx.fillStyle = `${accentColor}cc`;
+      ctx.font = '20px "SF Mono", monospace';
+      ctx.fillText('TASKS', W / 2, 330);
+
+      // 分隔线
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(40, 360, W - 80, 2);
+
+      // 成功率
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '14px "SF Mono", monospace';
+      ctx.fillText('SUCCESS RATE', W / 2, 400);
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = 'bold 36px "SF Mono", monospace';
+      ctx.fillText(`${rate}%`, W / 2, 450);
+
+      // 底部状态
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(0, H - 32, W, 32);
+      ctx.fillStyle = '#000';
+      ctx.font = '12px "SF Mono", monospace';
+      ctx.fillText('● LIVE  ·  5s REFRESH', W / 2, H - 12);
+
+      texture.needsUpdate = true;
+    } catch (_) {}
+  }, [canvas, texture, color, type]);
+
+  useEffect(() => { draw(); const iv = setInterval(draw, 5000); return () => clearInterval(iv); }, [draw]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+
 function ZoneLobby() {
   const c = FLOORS[0];
   return (
@@ -1445,7 +1703,126 @@ function ZoneProject() {
   </group>
   );
 }
-function ZoneCommand()  { const f = FLOORS[3]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneCommand() {
+  const c = FLOORS[3];
+  return (
+  <group position={[0, 0, 0]}>
+    <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[12, 8]} />
+      <meshStandardMaterial color={c.floorColor} roughness={0.4} metalness={0.3} emissive={c.glowColor} emissiveIntensity={0.08} />
+    </mesh>
+    <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[12, 8]} />
+      <meshStandardMaterial color={c.glowColor} transparent opacity={0.3} depthWrite={false} />
+    </mesh>
+
+    {/* ===== 主控台（面向屏幕的操控席） ===== */}
+    {/* 中央操控台 */}
+    <mesh position={[0, 0.7, 2.2]} castShadow receiveShadow>
+      <boxGeometry args={[4.5, 0.06, 0.9]} />
+      <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={c.glowColor} emissiveIntensity={0.06} />
+    </mesh>
+    {/* 中央台面屏幕 */}
+    <mesh position={[0, 1.0, 2.2]}>
+      <boxGeometry args={[3.8, 0.4, 0.03]} />
+      <meshStandardMaterial color="#0a1520" roughness={0.1} metalness={0.5} emissive={c.glowColor} emissiveIntensity={0.3} />
+    </mesh>
+    {/* 屏幕数据线 */}
+    {[-1.2, -0.6, 0, 0.6, 1.2].map((x, i) => (
+      <mesh key={i} position={[x, 1.1, 2.21]}>
+        <boxGeometry args={[0.4, 0.03, 0.01]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={i === 2 ? 2.0 : 0.8} />
+      </mesh>
+    ))}
+
+    {/* 左右两组操控席 */}
+    {[-3.5, 3.5].map((x, si) => (
+      <group key={si} position={[x, 0, 1.8]}>
+        <mesh position={[0, 0.7, 0]} castShadow receiveShadow>
+          <boxGeometry args={[1.8, 0.06, 0.8]} />
+          <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={c.glowColor} emissiveIntensity={0.06} />
+        </mesh>
+        <mesh position={[0, 1.0, 0]}>
+          <boxGeometry args={[1.4, 0.3, 0.03]} />
+          <meshStandardMaterial color="#0a1520" roughness={0.1} metalness={0.5} emissive={c.glowColor} emissiveIntensity={0.3} />
+        </mesh>
+        {/* 数据条 */}
+        {[-0.4, 0, 0.4].map((dx, j) => (
+          <mesh key={j} position={[dx, 1.1, 0.01]}>
+            <boxGeometry args={[0.25, 0.03, 0.01]} />
+            <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+          </mesh>
+        ))}
+        {/* 操作员椅子 */}
+        <OfficeChair position={[0, 0, -0.9]} rotation={0} />
+      </group>
+    ))}
+
+    {/* 指挥席椅子（中央台） */}
+    {[-1.5, -0.5, 0.5, 1.5].map((x, i) => (
+      <OfficeChair key={i} position={[x, 0, 3.0]} rotation={Math.PI} />
+    ))}
+
+    {/* ===== 三块数据驱动大屏 ===== */}
+    {/* 左屏 - 向中倾斜20度 */}
+    <group position={[-4.4, 2.1, -2.4]} rotation={[0, Math.PI / 4.5, 0]}>
+      {/* 边框 */}
+      <mesh position={[0, 0, -0.08]}>
+        <boxGeometry args={[3.4, 2.4, 0.12]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+      </mesh>
+      {/* 数据屏 */}
+      <MiniTaskStatScreen width={3.2} height={2.2} color={c.glowColor} type="pending" />
+      {/* 顶部装饰条 */}
+      <mesh position={[0, 1.14, 0.04]}>
+        <boxGeometry args={[3.0, 0.14, 0.02]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.0} />
+      </mesh>
+      <pointLight position={[0, 0, 1]} intensity={0.6} color={c.glowColor} distance={5} />
+    </group>
+
+    {/* 中央主屏 - 保持正中 */}
+    <group position={[0, 2.5, -3.9]}>
+      {/* 边框 */}
+      <mesh position={[0, 0, -0.1]}>
+        <boxGeometry args={[6.2, 3.2, 0.14]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} />
+      </mesh>
+      {/* 数据总屏 */}
+      <TaskCommandScreen width={6.0} height={3.0} color={c.glowColor} />
+      {/* 顶部标题横条 */}
+      <mesh position={[0, 1.54, 0.04]}>
+        <boxGeometry args={[5.8, 0.16, 0.02]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.5} />
+      </mesh>
+      <pointLight position={[0, 0, 1]} intensity={1.0} color={c.glowColor} distance={8} />
+    </group>
+
+    {/* 右屏 - 向中倾斜20度 */}
+    <group position={[4.4, 2.1, -2.4]} rotation={[0, -Math.PI / 4.5, 0]}>
+      {/* 边框 */}
+      <mesh position={[0, 0, -0.08]}>
+        <boxGeometry args={[3.4, 2.4, 0.12]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+      </mesh>
+      {/* 数据屏 */}
+      <MiniTaskStatScreen width={3.2} height={2.2} color={c.glowColor} type="done" />
+      {/* 顶部装饰条 */}
+      <mesh position={[0, 1.14, 0.04]}>
+        <boxGeometry args={[3.0, 0.14, 0.02]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.0} />
+      </mesh>
+      <pointLight position={[0, 0, 1]} intensity={0.6} color={c.glowColor} distance={5} />
+    </group>
+
+    {/* 环境光照 */}
+    <pointLight position={[0, 2.5, -2]} intensity={1.5} color={c.glowColor} distance={12} />
+    <rectAreaLight position={[0, 3.5, -3.8]} rotation={[-Math.PI / 2, 0, 0]} width={8} height={2.5} intensity={1.2} color={c.glowColor} />
+    <pointLight position={[-4, 1, 0]} intensity={0.6} color={c.glowColor} distance={8} />
+    <pointLight position={[4, 1, 0]} intensity={0.6} color={c.glowColor} distance={8} />
+  </group>
+  );
+}
 function ZoneArchive() { const f = FLOORS[4]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 function ZoneCore()    { const f = FLOORS[5]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 

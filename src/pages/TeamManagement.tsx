@@ -7,6 +7,7 @@ const API_BASE = 'http://localhost:5301';
 interface Team {
   id: string;
   name: string;
+  avatar?: string;
   description?: string;
   memberIds: string[];
   relationships: { source: string; target: string }[];
@@ -39,7 +40,7 @@ export default function TeamManagement() {
   const [formData, setFormData] = useState<TeamFormData>(defaultFormData);
   const [submitting, setSubmitting] = useState(false);
   
-  const { loadFromServer, relationships } = useTopologyStore();
+  const { loadFromServer } = useTopologyStore();
 
   // 加载团队数据
   const fetchTeams = async () => {
@@ -63,7 +64,7 @@ export default function TeamManagement() {
   // 打开新增弹窗
   const openAddModal = () => {
     setModalMode('add');
-    setFormData({ ...defaultFormData, relationships: relationships });
+    setFormData({ ...defaultFormData });
     setSelectedTeam(null);
     setShowModal(true);
   };
@@ -156,13 +157,15 @@ export default function TeamManagement() {
     if (confirm(`切换到团队 "${team.name}" 吗？当前未保存的关系将会丢失。`)) {
       // 保存当前关系到新团队
       try {
+        const { getRelationships } = useTopologyStore.getState();
+        const currentRelationships = getRelationships();
         await fetch(`${API_BASE}/api/teams`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: '临时保存',
             memberIds: DEFAULT_EMPLOYEES.map(e => e.id),
-            relationships: relationships,
+            relationships: currentRelationships,
           }),
         });
       } catch (e) {

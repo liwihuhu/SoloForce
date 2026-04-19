@@ -19,6 +19,7 @@ import TaskCenter from './pages/TaskCenter';
 import Settings from './pages/Settings';
 
 import Floor3DDemo from './control-room/Floor3DDemo';
+import FloorFlatDemo from './control-room/FloorFlatDemo';
 import { useTopologyStore } from './store';
 
 const nodeTypes = {
@@ -509,11 +510,17 @@ export default function App() {
         >
           员工管理
         </NavLink>
-        <NavLink 
-          active={currentPage === '/tasks'} 
+        <NavLink
+          active={currentPage === '/tasks'}
           onClick={() => navigate('/tasks')}
         >
           任务中心
+        </NavLink>
+        <NavLink
+          active={currentPage === '/flat'}
+          onClick={() => navigate('/flat')}
+        >
+          🗺️ 平铺总览
         </NavLink>
         
         {/* 设置按钮 */}
@@ -542,6 +549,7 @@ export default function App() {
       <div style={{ flex: 1, height: 'calc(100vh - 56px)', marginTop: '56px', overflow: 'hidden' }}>
         <Routes>
           <Route path="/" element={<Floor3DDemo />} />
+          <Route path="/flat" element={<FloorFlatDemo />} />
           <Route path="/topology" element={<MainView />} />
           <Route path="/teams" element={<TeamManagement />} />
           <Route path="/employees" element={<EmployeeManagement />} />

@@ -1218,6 +1218,33 @@ function MiniTaskStatScreen({ width, height, color, type }: { width: number; hei
 
 
 
+function OfficeDesk({ position, color = '#1e3a5f' }: { position: [number, number, number]; color?: string }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.75, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.4, 0.06, 0.7]} />
+        <meshStandardMaterial color={color} roughness={0.3} metalness={0.1} />
+      </mesh>
+      {[[-0.6, 0], [0.6, 0], [-0.6, -0.25], [0.6, -0.25]].map(([x, z], i) => (
+        <mesh key={i} position={[x, 0.36, z]} castShadow>
+          <boxGeometry args={[0.05, 0.72, 0.05]} />
+          <meshStandardMaterial color="#2a2a3a" roughness={0.5} metalness={0.3} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.95, -0.1]} castShadow>
+        <boxGeometry args={[0.5, 0.35, 0.02]} />
+        <meshStandardMaterial color="#111122" roughness={0.1} metalness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.76, -0.1]} castShadow>
+        <boxGeometry args={[0.05, 0.12, 0.05]} />
+        <meshStandardMaterial color="#333344" roughness={0.3} metalness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
+
+
 function ZoneLobby() {
   const c = FLOORS[0];
   return (
@@ -1828,7 +1855,295 @@ function ZoneCommand() {
   </group>
   );
 }
-function ZoneArchive() { const f = FLOORS[4]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneArchive() {
+  const c = FLOORS[4];
+  const [taskHistory, setTaskHistory] = useState<any[]>([]);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:5301/api/task-history?page=1&pageSize=30').then(r => r.json()).catch(() => ({ success: false, data: { items: [] } }));
+        if (!cancelled && res.success) {
+          setTaskHistory(res.data.items || []);
+        }
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const statusColorMap: Record<string, string> = {
+    completed: '#22C55E',
+    failed: '#EF4444',
+    in_progress: '#FBBF24',
+  };
+
+  const displayTasks = useMemo(() => {
+    if (taskHistory.length === 0) return [];
+    const now = Date.now();
+    const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000;
+    return taskHistory
+      .filter((t: any) => new Date(t.createdAt || now).getTime() > sixMonthsAgo)
+      .slice(0, 20)
+      .map((t: any) => {
+        const ts = new Date(t.createdAt || now).getTime();
+        const xPos = ((ts - sixMonthsAgo) / (now - sixMonthsAgo) - 0.5) * 15;
+        const status = t.status || 'completed';
+        const color = statusColorMap[status] || '#A3E635';
+        return { ...t, xPos, color, ts };
+      });
+  }, [taskHistory]);
+
+  return (
+  <group position={[0, 0, 0]}>
+    {/* Floor */}
+    <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[20, 12]} />
+      <meshStandardMaterial color={c.floorColor} roughness={0.25} metalness={0.4} emissive={c.glowColor} emissiveIntensity={0.05} />
+    </mesh>
+    <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[20, 12]} />
+      <meshStandardMaterial color={c.glowColor} transparent opacity={0.1} depthWrite={false} />
+    </mesh>
+
+    {/* ===== BACK WALL - Full-width history timeline ===== */}
+    <group position={[0, 2.8, -5.5]}>
+      {/* Wall background */}
+      <mesh position={[0, 0, -0.1]}>
+        <boxGeometry args={[17, 5.5, 0.2]} />
+        <meshStandardMaterial color="#060e1a" roughness={0.3} metalness={0.6} />
+      </mesh>
+      {/* Top border */}
+      <mesh position={[0, 2.6, 0]}>
+        <boxGeometry args={[17, 0.12, 0.08]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.0} />
+      </mesh>
+
+      {/* Main title */}
+      <Text position={[0, 2.2, 0]} fontSize={0.32} color={c.glowColor} anchorX="center" anchorY="middle">
+        TASK HISTORY TIMELINE
+      </Text>
+
+      {/* Horizontal timeline bar */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[15.0, 0.08, 0.04]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.8} />
+      </mesh>
+
+      {/* NOW end marker */}
+      <mesh position={[7.5, 0.5, 0]}>
+        <sphereGeometry args={[0.14, 10, 10]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.5} roughness={0.1} metalness={0.6} />
+      </mesh>
+      <Text position={[7.5, 0.85, 0]} fontSize={0.14} color={c.glowColor} anchorX="center" anchorY="bottom">NOW</Text>
+
+      {/* Start marker */}
+      <mesh position={[-7.5, 0.5, 0]}>
+        <sphereGeometry args={[0.1, 10, 10]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.5} roughness={0.1} metalness={0.6} />
+      </mesh>
+      <Text position={[-7.5, 0.85, 0]} fontSize={0.14} color={c.glowColor} anchorX="center" anchorY="bottom">6M</Text>
+
+      {/* Month tick marks (evenly spaced) */}
+      {[-6, -4, -2, 0, 2, 4, 6].map((x, i) => (
+        <group key={i} position={[x, 0.5, 0]}>
+          <mesh>
+            <boxGeometry args={[0.04, 0.3, 0.04]} />
+            <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.0} roughness={0.2} metalness={0.7} />
+          </mesh>
+          <Text position={[0, -0.28, 0]} fontSize={0.12} color={`${c.glowColor}aa`} anchorX="center" anchorY="top">
+            {i === 0 ? '5M' : i === 1 ? '4M' : i === 2 ? '3M' : i === 3 ? '2M' : i === 4 ? '1M' : ''}
+          </Text>
+        </group>
+      ))}
+
+      {/* Task nodes along the timeline (clamped within bar) */}
+      {displayTasks.map((task: any, i: number) => {
+        const isSelected = selectedTask?.id === task.id;
+        const xClamped = Math.max(-7.2, Math.min(7.2, task.xPos));
+        const yOff = (i % 3 - 1) * 0.42;
+        return (
+          <group key={task.id || i} position={[xClamped, 0.5 + yOff + 0.12, 0]}>
+            {/* Connector */}
+            <mesh position={[0, -yOff / 2, 0]}>
+              <boxGeometry args={[0.03, Math.abs(yOff) + 0.1, 0.03]} />
+              <meshStandardMaterial color={task.color} emissive={task.color} emissiveIntensity={0.6} transparent opacity={0.6} />
+            </mesh>
+            {/* Node sphere */}
+            <mesh
+              onClick={() => setSelectedTask(isSelected ? null : task)}
+              onPointerOver={() => { document.body.style.cursor = 'pointer'; }}
+              onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+            >
+              <sphereGeometry args={[isSelected ? 0.18 : 0.1, 10, 10]} />
+              <meshStandardMaterial
+                color={task.color}
+                emissive={task.color}
+                emissiveIntensity={isSelected ? 3.0 : 1.5}
+                roughness={0.2}
+                metalness={0.5}
+              />
+            </mesh>
+            {isSelected && (
+              <pointLight position={[0, 0, 0.5]} intensity={1.2} color={task.color} distance={3} />
+            )}
+          </group>
+        );
+      })}
+
+      {/* Selected task detail card */}
+      {selectedTask && (
+        <group position={[0, -1.0, 0]}>
+          <mesh>
+            <boxGeometry args={[8, 1.0, 0.06]} />
+            <meshStandardMaterial color="#0a1828" roughness={0.2} metalness={0.7} emissive={selectedTask.color} emissiveIntensity={0.15} />
+          </mesh>
+          <mesh position={[0, 0, 0.04]}>
+            <boxGeometry args={[7.8, 1.1, 0.02]} />
+            <meshStandardMaterial color="#000c1a" roughness={0.1} metalness={0.3} />
+          </mesh>
+          {/* Status badge */}
+          <mesh position={[-3.4, 0.38, 0.06]}>
+            <boxGeometry args={[1.6, 0.28, 0.02]} />
+            <meshStandardMaterial color={selectedTask.color} emissive={selectedTask.color} emissiveIntensity={1.5} roughness={0.2} metalness={0.5} />
+          </mesh>
+          <Text position={[-3.4, 0.38, 0.08]} fontSize={0.12} color="#000" anchorX="center" anchorY="middle">
+            {String(selectedTask.status || 'completed').toUpperCase()}
+          </Text>
+          <Text position={[0, 0.28, 0.08]} fontSize={0.15} color="#fff" anchorX="center" anchorY="middle">
+            {selectedTask.taskId || `Task-${selectedTask.id?.slice(0, 8) || '?'}`}
+          </Text>
+          <Text position={[0, 0.0, 0.08]} fontSize={0.11} color={`${c.glowColor}cc`} anchorX="center" anchorY="middle">
+            {selectedTask.createdAt ? new Date(selectedTask.createdAt).toLocaleString() : 'Unknown time'}
+          </Text>
+          {selectedTask.agentId && (
+            <Text position={[0, -0.22, 0.08]} fontSize={0.1} color="#94a3b8" anchorX="center" anchorY="middle">
+              AGENT: {selectedTask.agentId}
+            </Text>
+          )}
+          <Text position={[3.5, 0.38, 0.08]} fontSize={0.09} color="#475569" anchorX="right" anchorY="middle">click to close</Text>
+        </group>
+      )}
+
+      {/* Legend */}
+      <group position={[0, -2.1, 0]}>
+        {Object.entries(statusColorMap).map(([status, color], i) => (
+          <group key={status} position={[(i - 1) * 3.0, 0, 0]}>
+            <mesh>
+              <sphereGeometry args={[0.09, 8, 8]} />
+              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.0} roughness={0.2} metalness={0.5} />
+            </mesh>
+            <Text position={[0.2, 0, 0]} fontSize={0.12} color={color} anchorX="left" anchorY="middle">
+              {status === 'completed' ? 'DONE' : status === 'failed' ? 'FAIL' : 'ACTIVE'}
+            </Text>
+          </group>
+        ))}
+      </group>
+
+      {/* Back wall lighting */}
+      <pointLight position={[-6, 0, 2]} intensity={0.8} color={c.glowColor} distance={8} />
+      <pointLight position={[6, 0, 2]} intensity={0.8} color={c.glowColor} distance={8} />
+      <pointLight position={[0, 3, 1]} intensity={0.6} color={c.glowColor} distance={8} />
+    </group>
+
+    {/* ===== Statistics pillars (left and right) ===== */}
+    {/* Left pillar */}
+    <group position={[-8, 2.2, -4.0]}>
+      <mesh>
+        <boxGeometry args={[1.8, 4.5, 0.8]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} emissive={c.glowColor} emissiveIntensity={0.08} />
+      </mesh>
+      <Text position={[0, 2.0, 0.42]} fontSize={0.18} color={c.glowColor} anchorX="center" anchorY="middle">TASKS</Text>
+      <Text position={[0, 1.65, 0.42]} fontSize={0.11} color={`${c.glowColor}88`} anchorX="center" anchorY="middle">ALL TIME</Text>
+      {[-0.5, 0, 0.5].map((x, i) => {
+        const heights = [1.8, 2.5, 1.2];
+        return (
+          <mesh key={i} position={[x, -0.3, 0.42]}>
+            <boxGeometry args={[0.35, heights[i], 0.05]} />
+            <meshStandardMaterial color={[c.glowColor, '#22C55E', '#EF4444'][i]} emissive={[c.glowColor, '#22C55E', '#EF4444'][i]} emissiveIntensity={0.8} roughness={0.2} metalness={0.6} />
+          </mesh>
+        );
+      })}
+      <Text position={[-0.5, -1.05, 0.42]} fontSize={0.1} color={c.glowColor} anchorX="center" anchorY="middle">ALL</Text>
+      <Text position={[0, -1.05, 0.42]} fontSize={0.1} color="#22C55E" anchorX="center" anchorY="middle">DONE</Text>
+      <Text position={[0.5, -1.05, 0.42]} fontSize={0.1} color="#EF4444" anchorX="center" anchorY="middle">FAIL</Text>
+    </group>
+
+    {/* Right pillar - rate */}
+    <group position={[8, 2.2, -4.0]}>
+      <mesh>
+        <boxGeometry args={[1.8, 4.5, 0.8]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} emissive={c.glowColor} emissiveIntensity={0.08} />
+      </mesh>
+      <Text position={[0, 2.0, 0.42]} fontSize={0.18} color={c.glowColor} anchorX="center" anchorY="middle">RATE</Text>
+      <Text position={[0, 1.65, 0.42]} fontSize={0.11} color={`${c.glowColor}88`} anchorX="center" anchorY="middle">SUCCESS</Text>
+      {/* Circular progress ring */}
+      <mesh position={[0, 0.3, 0.42]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.9, 0.08, 8, 32]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.5} roughness={0.2} metalness={0.6} />
+      </mesh>
+      <mesh position={[0, 0.3, 0.42]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.9, 0.06, 8, 32, Math.PI * 1.25]} />
+        <meshStandardMaterial color="#22C55E" emissive="#22C55E" emissiveIntensity={2.0} roughness={0.1} metalness={0.5} />
+      </mesh>
+      <Text position={[0, 0.3, 0.46]} fontSize={0.28} color="#22C55E" anchorX="center" anchorY="middle">85%</Text>
+      <Text position={[0, -0.85, 0.42]} fontSize={0.1} color="#94a3b8" anchorX="center" anchorY="middle">CIRCLE = 85%</Text>
+    </group>
+
+    {/* ===== Archive cabinets (3 rows facing wall) ===== */}
+    {[-1, 0, 1].map((row) => {
+      return [-5, -2.5, 0, 2.5, 5].map((x, ci) => {
+        const cabinetColor = (row + ci) % 2 === 0 ? '#0f2a1a' : '#0f1e2a';
+        const statusColor = ci % 5 === 0 ? '#22C55E' : ci % 5 === 1 ? '#FBBF24' : ci % 5 === 2 ? '#60A5FA' : ci % 5 === 3 ? '#A78BFA' : '#34D399';
+        const zPos = row * 1.4 + 1.5;
+        return (
+          <group key={`cab-${row}-${ci}`} position={[x, 0, zPos]}>
+            {/* Cabinet body */}
+            <mesh position={[0, 1.1, 0]} castShadow receiveShadow>
+              <boxGeometry args={[1.4, 2.2, 0.5]} />
+              <meshStandardMaterial color={cabinetColor} roughness={0.4} metalness={0.6} emissive={c.glowColor} emissiveIntensity={0.1} />
+            </mesh>
+            {/* Drawer dividers */}
+            {[0.55, 1.1, 1.65].map((y, li) => (
+              <mesh key={li} position={[0, y, 0.26]}>
+                <boxGeometry args={[1.38, 0.015, 0.01]} />
+                <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={0.4} />
+              </mesh>
+            ))}
+            {/* Drawer handles */}
+            {[0.55, 1.1, 1.65].map((y, li) => (
+              <mesh key={li} position={[0, y, 0.27]}>
+                <boxGeometry args={[0.35, 0.05, 0.04]} />
+                <meshStandardMaterial color={statusColor} roughness={0.3} metalness={0.8} />
+              </mesh>
+            ))}
+            {/* Top status light */}
+            <mesh position={[0, 2.22, 0]}>
+              <sphereGeometry args={[0.06, 8, 8]} />
+              <meshStandardMaterial color={statusColor} roughness={0.2} metalness={0.8} emissive={statusColor} emissiveIntensity={0.8} />
+            </mesh>
+            <pointLight position={[0, 2.2, 0]} intensity={0.3} color={statusColor} distance={1.5} />
+          </group>
+        );
+      })}
+    )}
+
+    {/* Ambient Lighting */}
+    <pointLight position={[0, 4, 0]} intensity={1.5} color={c.glowColor} distance={18} />
+    <rectAreaLight position={[0, 4, 0]} rotation={[-Math.PI / 2, 0, 0]} width={20} height={12} intensity={0.8} color={c.glowColor} />
+    <pointLight position={[-6, 2, 0]} intensity={0.5} color={c.glowColor} distance={8} />
+    <pointLight position={[6, 2, 0]} intensity={0.5} color={c.glowColor} distance={8} />
+      {/* ── 5F 四边框发光条 ── */}
+      <mesh position={[-10, 0.01, 0]}><boxGeometry args={[0.1, 0.08, 12]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+      <mesh position={[10, 0.01, 0]}><boxGeometry args={[0.1, 0.08, 12]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+      <mesh position={[0, 0.01, -6]}><boxGeometry args={[20, 0.08, 0.1]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+      <mesh position={[0, 0.01, 6]}><boxGeometry args={[20, 0.08, 0.1]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+  </group>
+
+  );
+}
+
 function ZoneCore()    { const f = FLOORS[5]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 
 // ─────────────────────────────────────────────────────────────────

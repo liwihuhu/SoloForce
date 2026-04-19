@@ -4,9 +4,18 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { ActorState } from './types';
-import sceneArtData from '../data/scene-art.manifest.json';
-import type { SceneArtManifest } from './types';
-const sceneArt = sceneArtData as unknown as SceneArtManifest;
+import sceneArtJson from '../data/scene-art.manifest.json';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const artData = sceneArtJson as unknown as any;
+
+interface ModeInfo {
+  mode: string;
+  path?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  frameCount?: number;
+}
 
 interface ActorProps {
   position: { x: number; y: number };
@@ -28,8 +37,8 @@ const getAnimationConfig = (s: ActorState) => {
 
 export default function Actor({ position, state }: ActorProps) {
   const [currentFrame, setCurrentFrame] = useState(0);
-  const animationRef = useRef<number>();
-  const actorConfig = sceneArt.actor;
+  const animationRef = useRef<number | undefined>(undefined);
+  const actorConfig = artData.actor;
 
   // 动画逻辑
   useEffect(() => {
@@ -53,7 +62,7 @@ export default function Actor({ position, state }: ActorProps) {
   }, [state]);
 
   // 获取当前变体
-  const variant = actorConfig.variants.find(v => v.id === actorConfig.defaultVariantId);
+  const variant = actorConfig.variants.find((v: any) => v.id === actorConfig.defaultVariantId);
   
   // 获取当前模式
   const getCurrentMode = () => {
@@ -65,7 +74,7 @@ export default function Actor({ position, state }: ActorProps) {
       resting: 'idle',
     };
     const modeId = modeMap[state] || 'idle';
-    return variant?.modes.find(m => m.mode === modeId);
+    return variant?.modes.find((m: any) => m.mode === modeId);
   };
 
   const currentMode = getCurrentMode();

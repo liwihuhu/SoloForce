@@ -3504,24 +3504,6 @@ export default function Floor3DDemo() {
           🖱️ 右键拖动 - 平移<br />
           🖱️ 滚轮 - 缩放
         </div>
-        <button
-          onClick={() => navigate('/flat')}
-          style={{
-            marginTop: '10px',
-            width: '100%',
-            background: 'rgba(244,114,182,0.15)',
-            border: '1px solid #F472B6',
-            borderRadius: '8px',
-            padding: '7px 12px',
-            color: '#F472B6',
-            fontSize: '11px',
-            cursor: 'pointer',
-            fontFamily: "'SF Mono', 'Fira Code', monospace",
-            letterSpacing: '1px',
-          }}
-        >
-          🗺️ 平铺总览视图
-        </button>
       </div>
 
       {/* 底部状态栏 */}

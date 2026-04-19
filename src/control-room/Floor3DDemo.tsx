@@ -1862,11 +1862,14 @@ function CurvedTube({ nx, nz, color, index, total }: { nx: number; nz: number; c
   const meshRef = useRef<THREE.Mesh>(null!);
   const elapsed = useRef(0);
 
-  // 核心[0,2.2,0] → 弧形弯管(向下凹陷) → 终端[nx,1.2,nz]
-  // 控制点：中间点下压，产生自然下垂弧度
-  const midX = nx * 0.55;
-  const midY = 0.5;  // 大幅低于起止点，产生明显下垂
-  const midZ = nz * 0.55;
+  // 核心[0,2.2,0] → 弧形弯管(向下凹陷+XY平面弯曲) → 终端[nx,1.2,nz]
+  // 控制点：中间点下压 + 横向偏置，在XY平面内也产生弯曲
+  const r = Math.sqrt(nx * nx + nz * nz);
+  const perpX = r > 0.01 ? -nz / r : 0.5;  // 垂直于径向的横向单位向量
+  const perpZ = r > 0.01 ? nx / r : 0;
+  const midX = nx * 0.5 + perpX * 0.6;  // 加入横向弯曲
+  const midY = 0.4;  // 下垂
+  const midZ = nz * 0.5 + perpZ * 0.6;
 
   const curve = useMemo(() => new THREE.CatmullRomCurve3([
     new THREE.Vector3(0, 2.2, 0),

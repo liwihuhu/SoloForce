@@ -7,10 +7,13 @@ import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import { useNavigate } from 'react-router-dom';
+import { useRef, useState, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
+import * as THREE from 'three';
 
 // ─────────────────────────────────────────────────────────────────
 // 常量
 // ─────────────────────────────────────────────────────────────────
+const FLOORS = [
   { id: '1f', label: '1F 大厅',     color: '#38BDF8', floorColor: '#0c1a2e', wallColor: '#1e3a5f', glowColor: '#38BDF8' },
   { id: '2f', label: '2F 人事部',    color: '#4ADE80', floorColor: '#0c1e12', wallColor: '#1e4a2a', glowColor: '#4ADE80' },
   { id: '3f', label: '3F 项目组',    color: '#60A5FA', floorColor: '#0c0e1e', wallColor: '#1e2a4a', glowColor: '#60A5FA' },
@@ -60,6 +63,389 @@ function FloorPlane({ color, emissive, label }: { color: string; emissive: strin
     </group>
   );
 }
+
+interface LobbyStats {
+  teams: number;
+  employees: number;
+  tasksTotal: number;
+  tasksCompleted: number;
+  tasksRunning: number;
+  tasksFailed: number;
+  tasksPending: number;
+}
+
+
+
+function EmployeeBadge({ position, color, name, dept }: { position: [number, number, number]; color: string; name: string; dept: string }) {
+  return (
+    <group position={position}>
+      {/* 工牌底座 */}
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[0.35, 0.5, 0.02]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} roughness={0.2} metalness={0.8} />
+      </mesh>
+      {/* 头像区域 */}
+      <mesh position={[0, 0.1, 0.015]}>
+        <boxGeometry args={[0.22, 0.22, 0.01]} />
+        <meshStandardMaterial color="#001830" roughness={0.1} metalness={0.5} emissive={color} emissiveIntensity={0.2} />
+      </mesh>
+      {/* 姓名 */}
+      <mesh position={[0, -0.1, 0.015]}>
+        <boxGeometry args={[0.28, 0.06, 0.01]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} />
+      </mesh>
+    </group>
+  );
+}
+
+
+function EntranceWelcomeScreen({ position, color }: { position: [number, number, number]; color: string }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 256; c.height = 512; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5301/api/task-history/statistics');
+      const r = await res.json();
+      if (r.success) {
+        const ctx = canvas.getContext('2d')!;
+        const W = 256, H = 512;
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#000c1a';
+        ctx.fillRect(0, 0, W, H);
+        // 顶部标题
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, W, 60);
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 18px "SF Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('SOLOFORCE', W / 2, 38);
+        // 欢迎语
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 36px "SF Mono", monospace';
+        ctx.fillText('WELCOME', W / 2, 130);
+        ctx.font = '22px "SF Mono", monospace';
+        ctx.fillStyle = `${color}cc`;
+        ctx.fillText('SOLOFORCE', W / 2, 175);
+        // 分隔线
+        ctx.fillStyle = color;
+        ctx.fillRect(30, 200, W - 60, 2);
+        // 在线人数
+        const online = r.data.employeeCount || 12;
+        ctx.fillStyle = color;
+        ctx.font = 'bold 14px "SF Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('ONLINE NOW', W / 2, 240);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 72px "SF Mono", monospace';
+        ctx.fillText(String(online), W / 2, 330);
+        ctx.fillStyle = `${color}88`;
+        ctx.font = '16px "SF Mono", monospace';
+        ctx.fillText('DIGITAL WORKERS', W / 2, 375);
+        // 底部状态
+        ctx.fillStyle = '#22C55E';
+        ctx.fillRect(0, H - 36, W, 36);
+        ctx.fillStyle = '#000';
+        ctx.font = '14px "SF Mono", monospace';
+        ctx.fillText('● SYSTEM ONLINE', W / 2, H - 14);
+        texture.needsUpdate = true;
+      }
+    } catch (_) {}
+  }, [canvas, texture, color]);
+
+  useEffect(() => { fetchData(); const iv = setInterval(fetchData, 5000); return () => clearInterval(iv); }, [fetchData]);
+
+  return (
+    <mesh ref={meshRef} position={position}>
+      <planeGeometry args={[1.5, 3.0]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+function GateCounter({ position, color, side }: { position: [number, number, number]; color: string; side: 'in' | 'out' }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const [count, setCount] = useState(Math.floor(Math.random() * 50) + 20);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 128; c.height = 64; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const draw = useCallback((c: number) => {
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, 128, 64);
+    ctx.fillStyle = '#000c1a';
+    ctx.fillRect(0, 0, 128, 64);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 128, 18);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 11px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(side === 'in' ? 'IN' : 'OUT', 64, 13);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 28px "SF Mono", monospace';
+    ctx.fillText(String(c), 64, 50);
+    texture.needsUpdate = true;
+  }, [canvas, texture, color, side]);
+
+  useEffect(() => { draw(count); }, [count, draw]);
+  useEffect(() => {
+    const iv = setInterval(() => setCount(c => c + Math.floor(Math.random() * 3)), 3000);
+    return () => clearInterval(iv);
+  }, []);
+
+  return (
+    <mesh ref={meshRef} position={position}>
+      <planeGeometry args={[0.9, 0.45]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+function LobbyStatsScreen({ width = 10.5, height = 5.0, color = '#38BDF8', bgColor = '#000c1a' }: {
+  width?: number; height?: number; color?: string; bgColor?: string;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const [stats, setStats] = useState<LobbyStats>({
+    teams: 0, employees: 0,
+    tasksTotal: 0, tasksCompleted: 0, tasksRunning: 0, tasksFailed: 0, tasksPending: 0,
+  });
+
+  const canvas = useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = 1024;
+    c.height = 512;
+    return c;
+  }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  // 定时刷新数据
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5301/api/task-history/statistics');
+      const result = await res.json();
+      if (result.success) {
+        const d = result.data;
+        setStats({
+          teams: d.teamCount || 0,
+          employees: d.employeeCount || 12,
+          tasksTotal: d.total || 0,
+          tasksCompleted: d.completed || 0,
+          tasksRunning: d.running || 0,
+          tasksFailed: d.failed || 0,
+          tasksPending: d.pending || 0,
+        });
+      }
+    } catch (e) {
+      // 静默失败，保持旧数据
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    const interval = setInterval(fetchStats, 5000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
+
+  // 绘制统计内容
+  useLayoutEffect(() => {
+    const ctx = canvas.getContext('2d')!;
+    const W = 1024, H = 512;
+    ctx.clearRect(0, 0, W, H);
+
+    // 背景
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, W, H);
+
+    // 顶部标题条
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, W, 48);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 28px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SOLOFORCE · 数字员工概览', W / 2, 24);
+
+    // ===== 三大核心指标卡片 =====
+    const cardW = 280, cardH = 160, cardY = 80;
+    const cards = [
+      { label: 'TEAMS', value: stats.teams, unit: '个', color: '#60A5FA', icon: '◈' },
+      { label: 'DIGITAL WORKERS', value: stats.employees, unit: '人', color: '#4ADE80', icon: '◉' },
+      { label: 'TASKS DONE', value: stats.tasksCompleted, unit: '项', color: '#FBBF24', icon: '◆' },
+    ];
+    cards.forEach((card, i) => {
+      const cx = W / 2 - cardW * 1.5 + i * cardW + i * 20;
+      // 卡片背景
+      ctx.fillStyle = `${card.color}15`;
+      ctx.strokeStyle = card.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cx, cardY, cardW, cardH, 12);
+      ctx.fill();
+      ctx.stroke();
+      // 顶角装饰
+      ctx.fillStyle = card.color;
+      ctx.fillRect(cx + 10, cardY - 1, 40, 3);
+      // 图标
+      ctx.fillStyle = card.color;
+      ctx.font = '22px serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(card.icon, cx + 16, cardY + 28);
+      // 标签
+      ctx.fillStyle = `${card.color}cc`;
+      ctx.font = '18px "SF Mono", monospace';
+      ctx.fillText(card.label, cx + 16, cardY + 55);
+      // 数值
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 52px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(card.value), cx + cardW / 2, cardY + 115);
+      ctx.fillStyle = `${card.color}88`;
+      ctx.font = '16px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(i === 0 ? `共 ${stats.teams} 个团队` : i === 1 ? `在线 ${stats.employees} 名` : `已完成任务数`, cx + cardW / 2, cardY + 148);
+    });
+
+    // ===== 任务状态分布 =====
+    const barY = 270;
+    ctx.fillStyle = `${color}88`;
+    ctx.font = '14px "SF Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('TASK STATUS', 40, barY - 10);
+
+    const taskData = [
+      { label: '已完成', value: stats.tasksCompleted, color: '#22C55E' },
+      { label: '进行中', value: stats.tasksRunning, color: '#3B82F6' },
+      { label: '待执行', value: stats.tasksPending, color: '#F59E0B' },
+      { label: '已失败', value: stats.tasksFailed, color: '#EF4444' },
+    ];
+    const total = stats.tasksTotal || 1;
+    taskData.forEach((item, i) => {
+      const bx = 40 + i * 240;
+      const barW = (item.value / total) * 180;
+      // 背景条
+      ctx.fillStyle = `${item.color}22`;
+      ctx.beginPath();
+      ctx.roundRect(bx, barY, 200, 32, 6);
+      ctx.fill();
+      // 进度条
+      if (barW > 0) {
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.roundRect(bx, barY, Math.max(barW, 6), 32, 6);
+        ctx.fill();
+      }
+      // 标签+数值
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 14px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${item.label}  ${item.value}`, bx + 8, barY + 21);
+    });
+
+    // ===== 底部实时时间 =====
+    ctx.fillStyle = '#22C55E';
+    ctx.fillRect(0, H - 36, W, 36);
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}  ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    ctx.fillStyle = '#000';
+    ctx.font = '16px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`LIVE · ${timeStr} · 数据每5秒刷新`, W / 2, H - 16);
+
+    texture.needsUpdate = true;
+  }, [stats, color, bgColor, canvas, texture]);
+
+  // 每秒更新时间（不触发数据刷新，只更新时间）
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const ctx = canvas.getContext('2d')!;
+      const H = 512;
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}  ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(0, H - 36, 1024, 36);
+      ctx.fillStyle = '#000';
+      ctx.font = '16px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`LIVE · ${timeStr} · 数据每5秒刷新`, 1024 / 2, H - 16);
+      texture.needsUpdate = true;
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [canvas, texture]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+function ReceptionVisitorScreen({ position, color }: { position: [number, number, number]; color: string }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 256; c.height = 256; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5301/api/task-history/statistics');
+      const r = await res.json();
+      if (r.success) {
+        const ctx = canvas.getContext('2d')!;
+        const W = 256, H = 256;
+        ctx.clearRect(0, 0, W, H);
+        // 背景
+        ctx.fillStyle = '#000c1a';
+        ctx.fillRect(0, 0, W, H);
+        // 顶部条
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, W, 36);
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 16px "SF Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('今日访客', W / 2, 24);
+        // 访客数
+        const visitors = r.data.employeeCount || 12;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 80px "SF Mono", monospace';
+        ctx.fillText(String(visitors), W / 2, 160);
+        // 单位
+        ctx.fillStyle = `${color}cc`;
+        ctx.font = '18px "SF Mono", monospace';
+        ctx.fillText('DIGITAL VISITORS', W / 2, 200);
+        // 任务数小标签
+        const tasks = r.data.total || 0;
+        ctx.fillStyle = `${color}33`;
+        ctx.fillRect(20, 218, W - 40, 28);
+        ctx.fillStyle = color;
+        ctx.font = 'bold 14px "SF Mono", monospace';
+        ctx.fillText(`今日任务 ${tasks}`, W / 2, 237);
+        texture.needsUpdate = true;
+      }
+    } catch (_) {}
+  }, [canvas, texture, color]);
+
+  useEffect(() => { fetchData(); const iv = setInterval(fetchData, 5000); return () => clearInterval(iv); }, [fetchData]);
+
+  return (
+    <mesh ref={meshRef} position={position}>
+      <planeGeometry args={[1.2, 1.2]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+const EMP_TYPE_COLORS: Record<string, string> = {
+  superadmin: '#F59E0B', executor: '#DC2626', manager: '#7C3AED',
+  developer: '#3B82F6', designer: '#DB2777', analyst: '#059669',
+  writer: '#D97706', support: '#0891B2', researcher: '#7C3AED',
+  qa: '#DC2626', devops: '#4B5563', sales: '#EA580C',
+};
+
+
 
 function ZoneLobby() {
   const c = FLOORS[0];
@@ -228,11 +614,11 @@ function ZoneLobby() {
   </group>
   );
 }
-function ZoneHR()      { const f = FLOORS[1]; return <FloorPlane color={f.color} emissive={f.emissive} label={f.label} />; }
-function ZoneProject() { const f = FLOORS[2]; return <FloorPlane color={f.color} emissive={f.emissive} label={f.label} />; }
-function ZoneCommand()  { const f = FLOORS[3]; return <FloorPlane color={f.color} emissive={f.emissive} label={f.label} />; }
-function ZoneArchive() { const f = FLOORS[4]; return <FloorPlane color={f.color} emissive={f.emissive} label={f.label} />; }
-function ZoneCore()    { const f = FLOORS[5]; return <FloorPlane color={f.color} emissive={f.emissive} label={f.label} />; }
+function ZoneHR()      { const f = FLOORS[1]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneProject() { const f = FLOORS[2]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneCommand()  { const f = FLOORS[3]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneArchive() { const f = FLOORS[4]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneCore()    { const f = FLOORS[5]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 
 // ─────────────────────────────────────────────────────────────────
 // Scene

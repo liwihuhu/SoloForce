@@ -1856,30 +1856,6 @@ function SoftTube({ x, z, color }: { x: number; z: number; color: string }) {
 
 // ===========================================
 // 6F Neural Network — Organic Synaptic Connection (curved tube)
-function NeuralSynapse({ x1, z1, x2, z2, color }: { x1: number; z1: number; x2: number; z2: number; color: string }) {
-  const geo = useMemo(() => {
-    const midX = (x1 + x2) / 2;
-    const midZ = (z1 + z2) / 2;
-    const dx = x2 - x1, dz = z2 - z1;
-    // Curve offset perpendicular to line
-    const perpX = -dz * 0.3;
-    const perpZ = dx * 0.3;
-    const cpX = midX + perpX;
-    const cpZ = midZ + perpZ;
-    const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(x1, 2.2, z1),
-      new THREE.Vector3(cpX, 2.8, cpZ),
-      new THREE.Vector3(x2, 1.2, z2)
-    );
-    return new THREE.TubeGeometry(curve, 24, 0.018, 6, false);
-  }, [x1, z1, x2, z2]);
-
-  return (
-    <mesh geometry={geo}>
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} transparent opacity={0.55} roughness={0.2} metalness={0.6} />
-    </mesh>
-  );
-}
 
 // ===========================================
 // 6F Neural Network — Floating Info Card for each node
@@ -2462,20 +2438,6 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
 
           {/* Central point light */}
           <pointLight intensity={5.0} color={config.glowColor} distance={14} />
-
-          {/* ===== Neural synaptic connections (from core to each node position) ===== */}
-          {neuralNodes.map(({ angle }, i) => {
-            const nx = Math.sin(angle) * RING_RADIUS;
-            const nz = Math.cos(angle) * RING_RADIUS;
-            const midX = nx * 0.5;
-            const midZ = nz * 0.5;
-            const cp1x = midX + nz * 0.2;
-            const cp1z = midZ - nx * 0.2;
-            return (
-              <NeuralSynapse key={i} x1={0} z1={0} x2={nx} z2={nz}
-                color={neuralNodes[i].color} />
-            );
-          })}
 
         </group>
 

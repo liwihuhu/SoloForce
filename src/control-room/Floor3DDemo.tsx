@@ -1855,68 +1855,76 @@ function SoftTube({ x, z, color }: { x: number; z: number; color: string }) {
 }
 
 
-// ── 核心软管光效组件 ─────────────────────────────────────────────────────
-const RING_COUNT = 6;
+// ── 核心至终端的曲线管道光效 ─────────────────────────────────────────────
+// 每条管道：贝塞尔曲线 + CanvasTexture 流动脉冲
 
-function CoreTube({ nx, nz, color, label, index, totalCount }: {
-  nx: number; nz: number; color: string; label: string; index: number; totalCount: number
-}) {
-  const ringRefs = useRef<(THREE.Mesh | null)[]>([]);
-  const tubeRef = useRef<THREE.Mesh>(null);
+function CurvedTube({ nx, nz, color, index, total }: { nx: number; nz: number; color: string; index: number; total: number }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
   const elapsed = useRef(0);
 
-  // Core: [0, 2.2, 0], Terminal: [nx, 1.2, nz]
-  const dx = nx, dy = -1.0, dz = nz;
-  const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  // 核心[0,2.2,0] → 弧形弯管 → 终端[nx,1.2,nz]
+  // 控制点：从核心出发时水平方向弯折，产生自然弧度
+  const midX = nx * 0.55 + (nz > 0 ? -0.3 : 0.3);
+  const midY = 1.8 + Math.abs(nz) * 0.08;
+  const midZ = nz * 0.55;
 
-  // Rotation: align cylinder Y-axis to direction (nx, -1, nz)
-  const cLen = Math.sqrt(nz * nz + nx * nx);
-  const angle = Math.atan2(cLen, -1.0);
-  const ax = cLen > 0.001 ? nz / cLen : 0;
-  const az = cLen > 0.001 ? -nx / cLen : 0;
-  const qx = ax * Math.sin(angle / 2);
-  const qy = 0;
-  const qz = az * Math.sin(angle / 2);
-  const qw = Math.cos(angle / 2);
+  const curve = useMemo(() => new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 2.2, 0),
+    new THREE.Vector3(midX, midY, midZ),
+    new THREE.Vector3(nx, 1.2, nz),
+  ]), [nx, nz, midX, midY, midZ]);
+
+  // 流动纹理：沿U方向滚动的高光条纹
+  const texture = useMemo(() => {
+    const W = 128, H = 64;
+    const cv = document.createElement('canvas') as HTMLCanvasElement;
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d')!;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0a0e1a';
+    ctx.fillRect(0, 0, W, H);
+    // 管道本色底
+    ctx.fillStyle = color + '88';
+    ctx.fillRect(0, H / 2 - 10, W, 20);
+    // 初始：中心一道亮光
+    const grd = ctx.createLinearGradient(0, 0, W, 0);
+    grd.addColorStop(0, 'transparent');
+    grd.addColorStop(0.5, color + 'ff');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, H / 2 - 10, W, 20);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.needsUpdate = true;
+    return tex;
+  }, [color]);
 
   useFrame((_, delta) => {
     elapsed.current += delta;
-    const t = elapsed.current;
-    const speed = 1.2;
-    ringRefs.current.forEach((ring, j) => {
-      if (!ring) return;
-      const phase = (j + 1) / (RING_COUNT + 1);
-      const offset = index * (Math.PI * 2 / totalCount);
-      const flow = ((t * speed + phase * 4 + offset) % 4) / 4;
-      const intensity = Math.sin(flow * Math.PI) * 3.5 + 0.4;
-      (ring.material as THREE.MeshStandardMaterial).emissiveIntensity = intensity;
-    });
+    const speed = 0.35;
+    texture.offset.x = (elapsed.current * speed + index / total) % 1;
+    texture.needsUpdate = true;
+    if (meshRef.current) {
+      const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+      mat.map = texture;
+      mat.needsUpdate = true;
+    }
   });
 
   return (
-    <group>
-      {/* Base dim tube */}
-      <mesh
-        ref={tubeRef}
-        position={[nx / 2, 1.7, nz / 2]}
-        quaternion={[qx, qy, qz, qw]}
-      >
-        <cylinderGeometry args={[0.04, 0.04, len, 6]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.12} transparent opacity={0.25} />
-      </mesh>
-      {/* Flowing rings */}
-      {Array.from({ length: RING_COUNT }, (_, j) => (
-        <mesh
-          key={j}
-          ref={el => { ringRefs.current[j] = el; }}
-          position={[nx / 2, 1.7, nz / 2]}
-          quaternion={[qx, qy, qz, qw]}
-        >
-          <torusGeometry args={[0.08, 0.03, 6, 16]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} transparent opacity={0.8} />
-        </mesh>
-      ))}
-    </group>
+    <mesh ref={meshRef}>
+      <tubeGeometry args={[curve, 24, 0.06, 8, false]} />
+      <meshStandardMaterial
+        color={color + '66'}
+        emissive={color}
+        emissiveIntensity={0.5}
+        map={texture}
+        transparent
+        opacity={0.9}
+        roughness={0.2}
+        metalness={0.8}
+      />
+    </mesh>
   );
 }
 
@@ -1930,14 +1938,13 @@ function CoreTubes({ terminalNodes, RING_RADIUS }: {
         const nx = Math.sin(angle) * RING_RADIUS;
         const nz = Math.cos(angle) * RING_RADIUS;
         return (
-          <CoreTube
+          <CurvedTube
             key={label}
             nx={nx}
             nz={nz}
             color={color}
-            label={label}
             index={i}
-            totalCount={terminalNodes.length}
+            total={terminalNodes.length}
           />
         );
       })}

@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Text, OrthographicCamera } from '@react-three/drei';
+import { OrbitControls, Text, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useNavigate } from 'react-router-dom';
 
@@ -634,8 +634,9 @@ function Scene({ oc }: { oc: OC | null }) {
         enableRotate={false}
         minPolarAngle={Math.PI / 2}
         maxPolarAngle={Math.PI / 2}
-        minDistance={20}
-        maxDistance={300}
+        minDistance={50}
+        maxDistance={600}
+        target={[205, 0, -15]}
       />
     </>
   );
@@ -743,12 +744,13 @@ export default function FloorFlatDemo() {
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl }) => { gl.setClearColor('#030810'); }}
       >
-        <OrthographicCamera
+        <PerspectiveCamera
           makeDefault
-          position={[200, 120, 0]}
-          zoom={1.2}
+          position={[205, 280, 0.5]}
+          fov={55}
           near={0.1}
           far={1000}
+        />
         />
         <Scene oc={oc} />
       </Canvas>

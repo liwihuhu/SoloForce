@@ -2419,7 +2419,7 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
 
           {/* 核心顶背对背双屏 — 两屏背对背立于核心上方 */}
           {/* 左屏：朝左 (rotation.y = π/2) */}
-          <group position={[-0.5, 1.6, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <group position={[-0.28, 1.6, 0]} rotation={[0, Math.PI / 2, 0]}>
             <mesh position={[0, 0, 0]}>
               <boxGeometry args={[1.0, 0.9, 0.04]} />
               <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.1} />
@@ -2432,7 +2432,7 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
             <Text position={[0, -0.16, 0.036]} fontSize={0.1} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>NEURAL ENGINE v2.0</Text>
           </group>
           {/* 右屏：朝右 (rotation.y = -π/2) */}
-          <group position={[0.5, 1.6, 0]} rotation={[0, -Math.PI / 2, 0]}>
+          <group position={[0.28, 1.6, 0]} rotation={[0, -Math.PI / 2, 0]}>
             <mesh position={[0, 0, 0]}>
               <boxGeometry args={[1.0, 0.9, 0.04]} />
               <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.1} />

@@ -1918,8 +1918,8 @@ function CurvedTube({ nx, nz, color, index, total }: { nx: number; nz: number; c
     <mesh ref={meshRef}>
       <tubeGeometry args={[curve, 32, 0.06, 8, false]} />
       <meshStandardMaterial
-        color={color + '66'}
-        emissive={color}
+        color={'#ffffff66'}
+        emissive={'#ffffff'}
         emissiveIntensity={0.5}
         map={texture}
         transparent

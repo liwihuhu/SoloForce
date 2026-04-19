@@ -3397,6 +3397,39 @@ export default function Floor3DDemo() {
         border: `1px solid ${currentConfig.color}30`,
         backdropFilter: 'blur(10px)',
       }}>
+        {/* 平铺总览按钮 */}
+        <button
+          key="flat"
+          onClick={() => navigate('/flat')}
+          style={{
+            background: 'transparent',
+            border: `1px solid #a78bfa60`,
+            borderRadius: '8px',
+            padding: '8px 14px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            transition: 'all 0.2s ease',
+            marginBottom: '4px',
+          }}
+        >
+          <div style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: '#a78bfa60',
+          }} />
+          <span style={{
+            fontSize: '12px',
+            fontFamily: "'SF Mono', 'Fira Code', monospace",
+            color: '#8a7aba',
+            fontWeight: '400',
+          }}>
+            平铺总览
+          </span>
+        </button>
+
         {FLOORS.slice().reverse().map((floor) => {
           const isActive = floor.id === currentFloor;
           return (

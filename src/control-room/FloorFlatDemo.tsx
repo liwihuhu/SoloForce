@@ -752,6 +752,214 @@ function EmployeeStation({
 }
 
 
+function TeamOverviewScreen({ width = 12, height = 6, color = '#60A5FA', teams = [] }: {
+  width?: number; height?: number; color?: string; teams: any[];
+}) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 512; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  useLayoutEffect(() => {
+    const ctx = canvas.getContext('2d')!;
+    const W = 1024, H = 512;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#000c1a';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, W, 48);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 24px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PROJECT TEAMS · 项目团队总览', W / 2, 24);
+    const totalTeams = teams.length;
+    const totalMembers = teams.reduce((s: number, t: any) => s + t.memberIds.length, 0);
+    const totalTasks = teams.reduce((s: number, t: any) => s + Math.floor(Math.random() * 20) + 5, 0);
+    const topCards = [
+      { label: 'TEAMS', value: totalTeams, color: '#60A5FA' },
+      { label: 'MEMBERS', value: totalMembers, color: '#4ADE80' },
+      { label: 'TOTAL TASKS', value: totalTasks, color: '#FBBF24' },
+      { label: 'COMPLETED', value: Math.floor(totalTasks * 0.7), color: '#22C55E' },
+    ];
+    topCards.forEach((card, i) => {
+      const cx = 40 + i * 242;
+      ctx.fillStyle = `${card.color}15`;
+      ctx.strokeStyle = card.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cx, 68, 222, 100, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = card.color;
+      ctx.fillRect(cx + 10, 68, 36, 3);
+      ctx.fillStyle = `${card.color}cc`;
+      ctx.font = '15px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(card.label, cx + 14, 98);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 40px "SF Mono", monospace';
+      ctx.fillText(String(card.value), cx + 14, 148);
+    });
+    const listY = 195;
+    ctx.fillStyle = `${color}88`;
+    ctx.font = '14px "SF Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('TEAM ROSTER', 40, listY - 10);
+    const cardW = 280, cardH = 130, cardGap = 20;
+    const startX = 40;
+    teams.slice(0, 3).forEach((team: any, ti) => {
+      const cx = startX + ti * (cardW + cardGap);
+      const progress = Math.random() * 0.5 + 0.3;
+      const tc = ['#60A5FA', '#4ADE80', '#FBBF24'][ti];
+      ctx.fillStyle = `${tc}10`;
+      ctx.strokeStyle = tc;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cx, listY, cardW, cardH, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = tc;
+      ctx.fillRect(cx + 12, listY + 12, 32, 3);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 20px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(team.name, cx + 14, listY + 40);
+      ctx.fillStyle = `${tc}cc`;
+      ctx.font = '13px "SF Mono", monospace';
+      ctx.fillText(`👤  ${team.memberIds.length} 人`, cx + 14, listY + 62);
+      ctx.fillStyle = `${tc}22`;
+      ctx.beginPath();
+      ctx.roundRect(cx + 14, listY + 80, cardW - 28, 16, 4);
+      ctx.fill();
+      ctx.fillStyle = tc;
+      ctx.beginPath();
+      ctx.roundRect(cx + 14, listY + 80, (cardW - 28) * progress, 16, 4);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round(progress * 100)}% 完成`, cx + cardW / 2, listY + 92);
+    });
+    ctx.fillStyle = '#22C55E';
+    ctx.fillRect(0, H - 36, W, 36);
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    ctx.fillStyle = '#000';
+    ctx.font = '15px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`LIVE · ${timeStr} · 项目团队看板 · 每5秒刷新`, W / 2, H - 14);
+    texture.needsUpdate = true;
+  }, [teams, color, canvas, texture]);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const ctx = canvas.getContext('2d')!;
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(0, 512 - 36, 1024, 36);
+      ctx.fillStyle = '#000';
+      ctx.font = '15px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`LIVE · ${timeStr} · 项目团队看板 · 每5秒刷新`, 512, 512 - 14);
+      texture.needsUpdate = true;
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [canvas, texture]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+function MeetingTable({ color }: { color: string }) {
+  return (
+    <group>
+      {/* 桌面（椭圆形） */}
+      <mesh position={[0, 0.75, 0]}>
+        <cylinderGeometry args={[1.2, 1.2, 0.06, 32]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.15} metalness={0.85} emissive={color} emissiveIntensity={0.08} />
+      </mesh>
+      {/* 桌面 */}
+      {/* 桌腿 x4 */}
+      {[[0.95, 0, 0.65], [-0.95, 0, 0.65], [0.95, 0, -0.65], [-0.95, 0, -0.65]].map(([x, , z], i) => (
+        <mesh key={i} position={[x, 0.37, z]}>
+          <cylinderGeometry args={[0.06, 0.06, 0.74, 8]} />
+          <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.9} />
+        </mesh>
+      ))}
+      {/* 桌下横梁连接 */}
+      <mesh position={[0, 0.1, 0]} rotation={[0, 0, 0]}>
+        <boxGeometry args={[1.8, 0.05, 0.05]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.3} metalness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.1, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <boxGeometry args={[1.2, 0.05, 0.05]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.3} metalness={0.8} />
+      </mesh>
+    </group>
+  );
+}
+
+
+function TableSeat({ position, member, onClick }: {
+  position: [number, number, number]; member: any; onClick: (id: string) => void;
+}) {
+  const ec = EMP_TYPE_COLORS[member.type] || '#60A5FA';
+  const statusColor = member.status === 'busy' ? '#F59E0B' : member.status === 'offline' ? '#6B7280' : '#22C55E';
+  const angle = Math.atan2(position[2], position[0]);
+  const facingAngle = angle + Math.PI; // face toward table center
+
+  return (
+    <group position={position}>
+      {/* 椅子底座 */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.38, 20]} />
+        <meshStandardMaterial color={ec} emissive={ec} emissiveIntensity={0.1} transparent opacity={0.4} />
+      </mesh>
+      {/* 椅子腿 */}
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.38, 8]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.9} />
+      </mesh>
+      {/* 椅背 */}
+      <mesh position={[Math.sin(facingAngle) * 0.35, 0.5, Math.cos(facingAngle) * 0.35]} rotation={[0, facingAngle, 0]}>
+        <boxGeometry args={[0.5, 0.45, 0.05]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.8} emissive={ec} emissiveIntensity={0.15} />
+      </mesh>
+      {/* 座位面 */}
+      <mesh position={[0, 0.42, 0]}>
+        <boxGeometry args={[0.42, 0.05, 0.42]} />
+        <meshStandardMaterial color="#0d1f35" roughness={0.2} metalness={0.8} />
+      </mesh>
+      {/* 名牌底座 */}
+      <mesh position={[0, 0.65, 0]} rotation={[-0.2, facingAngle, 0]}>
+        <boxGeometry args={[0.28, 0.22, 0.02]} />
+        <meshStandardMaterial color={ec} emissive={ec} emissiveIntensity={0.6} roughness={0.2} metalness={0.7} />
+      </mesh>
+      {/* 状态灯 */}
+      <mesh position={[0.25, 0.65, 0.1]}>
+        <sphereGeometry args={[0.05, 8, 8]} />
+        <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={3.0} />
+      </mesh>
+      {/* 拾取区域（隐形） */}
+      <mesh
+        position={[0, 0.5, 0]}
+        onClick={(e) => { e.stopPropagation(); onClick(member.id); }}
+        visible={false}
+      >
+        <boxGeometry args={[0.6, 0.8, 0.6]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+    </group>
+  );
+}
+
+
 function ZoneLobby() {
   const c = FLOORS[0];
   return (
@@ -1067,7 +1275,176 @@ function ZoneHR() {
   </group>
   );
 }
-function ZoneProject() { const f = FLOORS[2]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneProject() {
+  const c = FLOORS[2];
+  // 获取团队数据
+      const [teamsData, setTeamsData] = useState<any[]>([]);
+      const [empData, setEmpData] = useState<any[]>([]);
+
+      useEffect(() => {
+        let cancelled = false;
+        (async () => {
+          try {
+            const [teamsRes, empRes] = await Promise.all([
+              fetch('http://localhost:5301/api/teams').then(r => r.json()).catch(() => ({ success: false })),
+              fetch('http://localhost:5301/api/employees').then(r => r.json()).catch(() => ({ success: false })),
+            ]);
+            if (cancelled) return;
+            setTeamsData(teamsRes.success ? teamsRes.data : []);
+            setEmpData(empRes.success ? empRes.data.items : []);
+          } catch (_) {}
+        })();
+        return () => { cancelled = true; };
+      }, []);
+
+      // 背景大屏尺寸
+      const screenW = 12, screenH = 5.5;
+      // 团队 Hub 布局参数
+      const hubRadius = 2.8; // Hub 到成员的半径
+      const hubSpacing = 6.0; // 团队间距（缩小避免重叠）
+      const hubY = 0; // Hub 的 y 坐标（地面）
+
+      // 稳定的模拟数据（避免每次渲染随机闪烁）
+      const teamProgressMap = useMemo(() => {
+        const map: Record<string, {progress: number, taskCount: number}> = {};
+        teamsData.forEach((t: any) => {
+          map[t.id] = { progress: Math.random() * 0.4 + 0.5, taskCount: Math.floor(Math.random() * 20) + 5 };
+        });
+        return map;
+      }, [teamsData]);
+  return (
+  <group position={[0, 0, 0]}>
+    {/* 地板 */}
+    <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 12]} />
+      <meshStandardMaterial color={c.floorColor} roughness={0.25} metalness={0.4} emissive={c.glowColor} emissiveIntensity={0.04} />
+    </mesh>
+    <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 12]} />
+      <meshStandardMaterial color={c.glowColor} transparent opacity={0.12} depthWrite={false} />
+    </mesh>
+
+    {/* ===== 地板发光边框 ===== */}
+    <mesh position={[0, 0.003, -6.0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+    <mesh position={[0, 0.003, 6.0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+    <mesh position={[-8.0, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+      <planeGeometry args={[12, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+    <mesh position={[8.0, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+      <planeGeometry args={[12, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+
+    {/* ===== 背景墙多团队总览大屏 ===== */}
+    <group position={[0, 3.2, -5.7]}>
+      <mesh position={[0, 0, -0.08]}>
+        <boxGeometry args={[12.4, 6.4, 0.12]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+      </mesh>
+      <TeamOverviewScreen
+        width={12}
+        height={6}
+        color={c.glowColor}
+        teams={teamsData}
+      />
+      <mesh position={[0, 3.0, 0.01]}>
+        <boxGeometry args={[12.0, 0.3, 0.02]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.5} />
+      </mesh>
+      <pointLight position={[-7, 0, 1]} intensity={0.5} color={c.glowColor} distance={6} />
+      <pointLight position={[7, 0, 1]} intensity={0.5} color={c.glowColor} distance={6} />
+    </group>
+
+    {/* ===== 多团队围桌布局 ===== */}
+    {teamsData.slice(0, 3).map((team, ti) => {
+      const tableX = (ti - 1) * hubSpacing;
+      const members = team.memberIds
+        .map((id: string) => empData.find((e: any) => e.id === id))
+        .filter(Boolean);
+      const leader = members.find((m: any) => m.type === 'manager') || members[0];
+      const memberCount = members.length;
+      const seatRadius = 1.9;
+      const progress = teamProgressMap[team.id]?.progress ?? 0.7;
+      const taskCount = teamProgressMap[team.id]?.taskCount ?? 0;
+
+      return (
+        <group key={team.id} position={[tableX, 0, 0]}>  
+          {/* 地面团队区域光圈 */}
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[2.4, 32]} />
+            <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={0.08} transparent opacity={0.45} />
+          </mesh>
+
+          {/* 会议桌 */}
+          <MeetingTable color={c.glowColor} />
+
+          {/* 桌上方团队名称 */}
+          <group position={[0, 1.88, 0]}>
+            <Text fontSize={0.26} color="#ffffff" anchorX="center" anchorY="middle">
+              {team.name}
+            </Text>
+            {leader && (
+              <Text position={[0, -0.3, 0]} fontSize={0.12} color={c.glowColor} anchorX="center" anchorY="middle">
+                {leader.name} · {leader.roleName}
+              </Text>
+            )}
+            <Text position={[0, -0.52, 0]} fontSize={0.1} color={c.glowColor + 'aa'} anchorX="center" anchorY="middle">
+              {taskCount} TASKS · {Math.round(progress * 100)}% DONE
+            </Text>
+          </group>
+
+          {/* 围桌座位 */}
+          {members.slice(0, 6).map((member: any, mi: number) => {
+            const total = Math.min(members.length, 6);
+            const angle = (mi / total) * Math.PI * 2;
+            const sx = Math.cos(angle) * seatRadius;
+            const sz = Math.sin(angle) * seatRadius;
+            return (
+              <TableSeat
+                key={member.id}
+                position={[sx, 0, sz]}
+                member={member}
+                onClick={dispatchEmployeeSelect}
+              />
+            );
+          })}
+
+          {/* 桌面补光 */}
+          <pointLight position={[0, 2.2, 0]} intensity={1.0} color={c.glowColor} distance={5} />
+        </group>
+      );
+    })}
+
+    {/* NO TEAMS HINT */}
+    {teamsData.length === 0 && (
+      <group position={[0, 1.5, 0]}>
+        <mesh>
+          <boxGeometry args={[6, 1.5, 0.1]} />
+          <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+        </mesh>
+        <mesh position={[0, 0, 0.06]}>
+          <planeGeometry args={[5.8, 1.3]} />
+          <meshBasicMaterial color="#000c1a" />
+        </mesh>
+      </group>
+    )}
+
+    {/* 环境光 */}
+    <pointLight position={[0, 5, 0]} intensity={1.5} color={c.glowColor} distance={18} />
+    <rectAreaLight position={[0, 5, 0]} rotation={[-Math.PI / 2, 0, 0]} width={16} height={12} intensity={0.8} color={c.glowColor} />
+    <pointLight position={[0, 4.5, 4.5]} intensity={0.4} color={c.glowColor} distance={8} />
+    <pointLight position={[-6, 2, -1]} intensity={0.3} color={c.glowColor} distance={8} />
+    <pointLight position={[6, 2, -1]} intensity={0.3} color={c.glowColor} distance={8} />
+  </group>
+  );
+}
 function ZoneCommand()  { const f = FLOORS[3]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 function ZoneArchive() { const f = FLOORS[4]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 function ZoneCore()    { const f = FLOORS[5]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }

@@ -2711,7 +2711,7 @@ export default function FloorFlatDemo() {
         <PerspectiveCamera makeDefault position={[0, 60, 120]} fov={55} near={0.1} far={1000} />
         <Scene />
       </Canvas>
-      <UIOverlay onBack={() => navigate('/control-room')} />
+      <UIOverlay onBack={() => navigate('/')} />
     </div>
   );
 }

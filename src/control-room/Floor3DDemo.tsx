@@ -2417,32 +2417,32 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
           {/* Central point light */}
           <pointLight intensity={5.0} color={config.glowColor} distance={14} />
 
-          {/* 核心顶双屏 — 夹角30°，随核心旋转 */}
-          {/* 左屏 */}
-          <group position={[-0.42, 1.55, 0.3]} rotation={[-Math.PI / 4, -Math.PI / 12, 0]}>
+          {/* 核心顶折叠屏 — 像折叠梯🪜一样垂直立在核心上方，夹角30° */}
+          {/* 左屏 (rotation.y = +π/6，屏幕朝向左前方) */}
+          <group position={[-0.55, 1.6, 0]} rotation={[0, Math.PI / 6, 0]}>
             <mesh>
-              <boxGeometry args={[1.1, 0.7, 0.04]} />
+              <boxGeometry args={[1.0, 0.8, 0.04]} />
               <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.1} />
             </mesh>
             <mesh position={[0, 0, 0.025]}>
-              <boxGeometry args={[1.15, 0.74, 0.01]} />
+              <boxGeometry args={[1.05, 0.84, 0.01]} />
               <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} transparent opacity={0.6} />
             </mesh>
             <Text position={[0, 0.06, 0.036]} fontSize={0.16} color={config.glowColor} anchorX="center" anchorY="middle">OPENCLAW</Text>
-            <Text position={[0, -0.12, 0.036]} fontSize={0.1} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>NEURAL ENGINE v2.0</Text>
+            <Text position={[0, -0.14, 0.036]} fontSize={0.1} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>NEURAL ENGINE v2.0</Text>
           </group>
-          {/* 右屏 */}
-          <group position={[0.42, 1.55, 0.3]} rotation={[-Math.PI / 4, Math.PI / 12, 0]}>
+          {/* 右屏 (rotation.y = -π/6，屏幕朝向右前方) */}
+          <group position={[0.55, 1.6, 0]} rotation={[0, -Math.PI / 6, 0]}>
             <mesh>
-              <boxGeometry args={[1.1, 0.7, 0.04]} />
+              <boxGeometry args={[1.0, 0.8, 0.04]} />
               <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.1} />
             </mesh>
             <mesh position={[0, 0, 0.025]}>
-              <boxGeometry args={[1.15, 0.74, 0.01]} />
+              <boxGeometry args={[1.05, 0.84, 0.01]} />
               <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} transparent opacity={0.6} />
             </mesh>
             <Text position={[0, 0.06, 0.036]} fontSize={0.16} color={config.glowColor} anchorX="center" anchorY="middle">AGENTS: 8</Text>
-            <Text position={[0, -0.12, 0.036]} fontSize={0.1} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>SESSIONS: 3</Text>
+            <Text position={[0, -0.14, 0.036]} fontSize={0.1} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>SESSIONS: 3</Text>
           </group>
 
         </group>

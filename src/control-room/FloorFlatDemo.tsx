@@ -1,26 +1,54 @@
 /**
- * FloorFlatDemo — Unified Canvas Floor + Zone Overlays
+ * FloorFlatDemo — 楼层拼接平铺视图
  *
- * Strategy:
- * - ONE canvas texture paints ALL zone colors onto ONE floor mesh
- * - NearestFilter avoids bilinear blurring at zone edges
- * - Oversized canvas coverage eliminates all boundary gaps
- * - Walls placed directly on the continuous floor
+ * 策略：
+ * - 6 个楼层的内容直接横向拼接，X 方向一字排开
+ * - 正交俯视相机（orthographic），从上往下看
+ * - 每个 Zone 内容保持原有 3D 结构，仅加 X 偏移
+ * - OrbitControls 支持平移和缩放（锁定旋转）
+ *
+ * 布局（X 轴方向）：
+ * 1F: x=0      (大厅)
+ * 2F: x=80     (人事部)
+ * 3F: x=160    (项目组)
+ * 4F: x=240    (任务大厅)
+ * 5F: x=310    (档案中心)
+ * 6F: x=380    (OpenClaw 机房)
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Text } from '@react-three/drei';
+import { OrbitControls, Text, OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useNavigate } from 'react-router-dom';
 
+// ─────────────────────────────────────────────────────────────────
+// 常量配置
+// ─────────────────────────────────────────────────────────────────
 const WALL_H = 3.5;
 const WALL_T = 0.18;
 
-// ─────────────────────────────────────────────────────────────────
-// STATIC DATA — 模块级常量，避免每次渲染重新创建
-// ─────────────────────────────────────────────────────────────────
-const LOBBY_VISITORS = Math.floor(Math.random() * 18) + 4; // 模块加载时固定值
+// 楼层 X 轴偏移量（横向拼接）
+const FLOOR_X: Record<string, number> = {
+  '1f': 0,
+  '2f': 80,
+  '3f': 160,
+  '4f': 240,
+  '5f': 310,
+  '6f': 380,
+};
+
+const FLOORS = [
+  { id: '1f', label: '1F 大厅',          color: '#38BDF8' },
+  { id: '2f', label: '2F 人事部',         color: '#4ADE80' },
+  { id: '3f', label: '3F 项目组',         color: '#60A5FA' },
+  { id: '4f', label: '4F 任务大厅',       color: '#FBBF24' },
+  { id: '5f', label: '5F 档案中心',       color: '#A3E635' },
+  { id: '6f', label: '6F OpenClaw 机房',  color: '#F472B6' },
+];
+
+// 模块级静态数据
+const LOBBY_VISITORS = Math.floor(Math.random() * 18) + 4;
 const TEAM_NAMES = ['ALPHA', 'BETA', 'GAMMA', 'DELTA'] as const;
 const TEAM_COLORS = ['#3B82F6', '#22C55E', '#F59E0B', '#EC4899'] as const;
 const KPI_DATA = [
@@ -29,8 +57,7 @@ const KPI_DATA = [
   { label: 'QUEUED',    v: '23',  col: '#60A5FA' },
   { label: 'COMPLETED', v: '847', col: '#22C55E' },
 ] as const;
-const KPI_POSITIONS: [number, number, number][] = [[-6,-6,0],[-6,-10,0],[6,-6,0],[6,-10,0]];
-const HR_AREA_COLORS = ['#3B82F6', '#4ADE80', '#FBBF24'] as const;
+const KPI_POSITIONS: [number, number, number][] = [[-8,-8,0],[-8,-18,0],[8,-8,0],[8,-18,0]];
 const CORE_NODES = [
   { l: 'ME',       k: 'ME',       col: '#E879F9' },
   { l: 'AGENTS',   k: 'AGENTS',   col: '#F472B6' },
@@ -42,90 +69,8 @@ const CORE_NODES = [
   { l: 'MCP',      k: 'MCP',      col: '#FB923C' },
 ] as const;
 
-const FLOORS = [
-  { id: '1f', label: '1F 大厅',          color: '#38BDF8' },
-  { id: '2f', label: '2F 人事部',         color: '#4ADE80' },
-  { id: '3f', label: '3F 项目组',         color: '#60A5FA' },
-  { id: '4f', label: '4F 任务大厅',       color: '#FBBF24' },
-  { id: '5f', label: '5F 档案中心',       color: '#A3E635' },
-  { id: '6f', label: '6F OpenClaw 机房',  color: '#F472B6' },
-];
-
 // ─────────────────────────────────────────────────────────────────
-// Canvas texture — solid fills, NO transparency, NearestFilter
-// ─────────────────────────────────────────────────────────────────
-function buildFloorTexture(): HTMLCanvasElement {
-  const W = 4096, H = 4096;
-  const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
-  const ctx = cv.getContext('2d')!;
-
-  // Map world coords to canvas pixels
-  // World: X -30..30 → canvas 0..W, Z -55..30 → canvas 0..H
-  const fx = (x: number) => ((x + 30) / 60) * W;
-  const fz = (z: number) => ((z + 55) / 85) * H;
-
-  // Dark base — fills entire canvas
-  ctx.fillStyle = '#030810';
-  ctx.fillRect(0, 0, W, H);
-
-  // Draw each zone as solid fill + stroke (both opaque)
-  function fillZone(pts: [number, number][], col: string, lineWidth = 4) {
-    ctx.beginPath();
-    ctx.moveTo(fx(pts[0][0]), fz(pts[0][1]));
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(fx(pts[i][0]), fz(pts[i][1]));
-    ctx.closePath();
-    ctx.fillStyle = col;
-    ctx.fill();
-    ctx.strokeStyle = col;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-  }
-
-  // ZONES — 新布局：4F+6F 占 55%，1F+5F 压缩
-  // 1F Lobby — 压缩到 Z=30→-8（高22，占26%）
-  fillZone([[-30, 30], [30, 30], [30, -8], [10, -8], [-10, -8]], '#0c1628', 5);
-  // 2F HR — 左矩形 Z=-8→-18
-  fillZone([[-30, -8], [-10, -8], [-10, -18], [-30, -18]], '#0c1e12', 4);
-  // 3F Project — 右矩形 Z=-8→-18
-  fillZone([[10, -8], [30, -8], [30, -18], [10, -18]], '#0c0e28', 4);
-  // 4F Command — 扩展到 Z=-8→-35（高27，占32%）
-  fillZone([[-10, -8], [10, -8], [10, -35], [-10, -35]], '#1a1a0c', 4);
-  // 6F Core — 扩大 octagon R=18，中心 Z=-44（占高23+，约27%）
-  const R = 18, CZ = -44;
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
-    const next = ((i + 1) / 8) * Math.PI * 2 - Math.PI / 8;
-    ctx.beginPath();
-    ctx.moveTo(fx(Math.cos(a) * R), fz(CZ + Math.sin(a) * R));
-    ctx.lineTo(fx(Math.cos(next) * R), fz(CZ + Math.sin(next) * R));
-    ctx.strokeStyle = '#0e0818';
-    ctx.lineWidth = 6;
-    ctx.stroke();
-  }
-  // Core fill
-  ctx.fillStyle = '#0e0818';
-  ctx.beginPath();
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
-    const x = fx(Math.cos(a) * R), z = fz(CZ + Math.sin(a) * R);
-    i === 0 ? ctx.moveTo(x, z) : ctx.lineTo(x, z);
-  }
-  ctx.closePath(); ctx.fill();
-  // 5F Archive — 压缩到 Z=-35→-55（高20，占24%）
-  fillZone([[-28, -35], [28, -35], [28, -55], [-28, -55]], '#0c1e0c', 4);
-
-  return cv;
-}
-
-const floorTex = buildFloorTexture();
-const floorCanvasTex = new THREE.CanvasTexture(floorTex);
-floorCanvasTex.magFilter = THREE.NearestFilter;
-floorCanvasTex.minFilter = THREE.NearestFilter;
-floorCanvasTex.generateMipmaps = false;
-
-// ─────────────────────────────────────────────────────────────────
-// Screen mesh
+// ScreenMesh — 通用屏幕
 // ─────────────────────────────────────────────────────────────────
 function ScreenMesh({ position, rotation, w, h, text, subText, color }: {
   position: [number, number, number]; rotation?: [number, number, number];
@@ -154,7 +99,7 @@ function ScreenMesh({ position, rotation, w, h, text, subText, color }: {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Wall
+// Wall — 隔墙（支持任意两点定义）
 // ─────────────────────────────────────────────────────────────────
 function Wall({ x1, z1, x2, z2, h = WALL_H }: {
   x1: number; z1: number; x2: number; z2: number; h?: number;
@@ -183,12 +128,11 @@ function Wall({ x1, z1, x2, z2, h = WALL_H }: {
 // ─────────────────────────────────────────────────────────────────
 function ZoneLobby() {
   const c = FLOORS[0];
-  const vis = LOBBY_VISITORS; // 模块级固定值，不再每次渲染变化
-
+  const vis = LOBBY_VISITORS;
   return (
     <group>
       {[-20, -13, -6, 0, 6, 13, 20].map((x, i) => (
-        <group key={i} position={[x, 0, 11]}>
+        <group key={i} position={[x, 0, 14]}>
           <mesh position={[0, 1.5, 0]}>
             <boxGeometry args={[0.45, 3, 0.12]} />
             <meshStandardMaterial color={c.color} emissive={c.color} emissiveIntensity={2.5} roughness={0.15} metalness={0.85} />
@@ -199,34 +143,34 @@ function ZoneLobby() {
           </mesh>
         </group>
       ))}
-      <mesh position={[0, 0.6, 3]}>
+      <mesh position={[0, 0.6, 6]}>
         <boxGeometry args={[16, 1.2, 2.2]} />
         <meshStandardMaterial color="#1e3a5f" roughness={0.25} metalness={0.75} emissive={c.color} emissiveIntensity={0.35} />
       </mesh>
-      <ScreenMesh position={[0, 1.9, 2.2]} w={14} h={3.5}
+      <ScreenMesh position={[0, 1.9, 5.2]} w={14} h={3.5}
         text="RECEPTION" subText={`VISITORS: ${vis}`} color={c.color} />
-      <ScreenMesh position={[0, 4, 14]} rotation={[0, Math.PI, 0]} w={56} h={10}
+      <ScreenMesh position={[0, 4, 18]} rotation={[0, Math.PI, 0]} w={56} h={10}
         text="WELCOME TO SOLOFORCE" subText="数字孪生 · 智慧协同 · 创新未来" color={c.color} />
-      <ScreenMesh position={[-2, 3.5, -5]} w={18} h={7}
+      <ScreenMesh position={[-2, 3.5, -1]} w={18} h={7}
         text="SOLOFORCE" subText="DIGITAL TWIN HQ" color={c.color} />
-      {[[-24, 8], [-24, -4], [24, 8], [24, -4]].map(([x, z], i) => (
+      {[[-24, 10], [-24, 0], [24, 10], [24, 0]].map(([x, z], i) => (
         <mesh key={i} position={[x, 1.75, z]}>
           <cylinderGeometry args={[0.4, 0.4, 3.5, 12]} />
           <meshStandardMaterial color="#1e3a5f" roughness={0.3} metalness={0.8} emissive={c.color} emissiveIntensity={0.2} />
         </mesh>
       ))}
-      {[[-16, -1], [0, -1], [16, -1]].map(([x, z], i) => (
+      {[[-16, 3], [0, 3], [16, 3]].map(([x, z], i) => (
         <mesh key={i} position={[x, 0.3, z]}>
           <boxGeometry args={[6, 0.6, 1.4]} />
           <meshStandardMaterial color="#1a2a4a" roughness={0.35} metalness={0.7} emissive={c.color} emissiveIntensity={0.1} />
         </mesh>
       ))}
-      <Text position={[0, 0.1, 13]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.1, 20]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
         1F · 大厅
       </Text>
-      <pointLight position={[0, 6, 5]}   color={c.color} intensity={4}  distance={40} />
-      <pointLight position={[-20, 4, 12]} color={c.color} intensity={1.5} distance={16} />
-      <pointLight position={[20,  4, 12]} color={c.color} intensity={1.5} distance={16} />
+      <pointLight position={[0, 6, 8]}   color={c.color} intensity={4}  distance={40} />
+      <pointLight position={[-20, 4, 14]} color={c.color} intensity={1.5} distance={16} />
+      <pointLight position={[20,  4, 14]} color={c.color} intensity={1.5} distance={16} />
     </group>
   );
 }
@@ -294,8 +238,8 @@ function ZoneHR() {
       {[-10, -13, -16].map((z, i) => (
         <mesh key={i} position={[-19, 0.04, z]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[16, 3.5]} />
-          <meshStandardMaterial color={HR_AREA_COLORS[i]}
-            transparent opacity={0.08} emissive={HR_AREA_COLORS[i]}
+          <meshStandardMaterial color={['#3B82F6', '#4ADE80', '#FBBF24'][i]}
+            transparent opacity={0.08} emissive={['#3B82F6', '#4ADE80', '#FBBF24'][i]}
             emissiveIntensity={0.5} depthWrite={false} />
         </mesh>
       ))}
@@ -316,7 +260,6 @@ function ZoneHR() {
 // ─────────────────────────────────────────────────────────────────
 function ZoneProject() {
   const c = FLOORS[2];
-
   return (
     <group>
       <ScreenMesh position={[19, 3.8, -13]} rotation={[0, Math.PI, 0]} w={16} h={8}
@@ -353,10 +296,10 @@ function ZoneProject() {
           </Text>
         </group>
       ))}
-      <Text position={[19, 0.1, -1]} fontSize={0.9} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[19, 0.1, -8]} fontSize={0.9} color={c.color} anchorX="center" anchorY="middle">
         3F · 项目组
       </Text>
-      <pointLight position={[19, 5, -10]} color={c.color} intensity={3} distance={22} />
+      <pointLight position={[19, 5, -13]} color={c.color} intensity={3} distance={22} />
     </group>
   );
 }
@@ -366,7 +309,6 @@ function ZoneProject() {
 // ─────────────────────────────────────────────────────────────────
 function ZoneCommand() {
   const c = FLOORS[3];
-
   return (
     <group>
       <group position={[0, 4.5, -21]}>
@@ -382,13 +324,8 @@ function ZoneCommand() {
             emissiveIntensity={4} roughness={0.1} metalness={0.9} />
         </mesh>
       </group>
-      {/* KPI 均匀分布在扩大的 command 区域 */}
       {KPI_DATA.map((k, i) => (
-        <group key={k.label} position={[
-          KPI_POSITIONS[i][0],
-          KPI_POSITIONS[i][1],
-          [-9, -20, -9, -20][i],
-        ]}>
+        <group key={k.label} position={[KPI_POSITIONS[i][0], KPI_POSITIONS[i][1], [-9,-20,-9,-20][i]]}>
           <mesh position={[0, 1.1, 0]}>
             <boxGeometry args={[4, 2.2, 0.12]} />
             <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.75}
@@ -440,7 +377,6 @@ function ZoneCore({ oc }: { oc: OC | null }) {
   const elapsed = useRef(0);
 
   useFrame((_, rawDelta) => {
-    // 防止 tab 切换后 delta 跳变（最多累积 100ms）
     const delta = Math.min(rawDelta, 0.1);
     elapsed.current += delta;
     const t = elapsed.current;
@@ -473,7 +409,7 @@ function ZoneCore({ oc }: { oc: OC | null }) {
 
   return (
     <group>
-      <group ref={coreRef} position={[0, 2.5, -44]}>
+      <group ref={coreRef} position={[0, 2.5, -22]}>
         <mesh>
           <icosahedronGeometry args={[1.4, 3]} />
           <meshStandardMaterial color={c.color} emissive={c.color}
@@ -485,7 +421,7 @@ function ZoneCore({ oc }: { oc: OC | null }) {
             emissiveIntensity={12} transparent opacity={0.7} />
         </mesh>
       </group>
-      <group position={[0, 2.5, -44]}>
+      <group position={[0, 2.5, -22]}>
         <mesh ref={ring1} rotation={[Math.PI / 3, 0, 0]}>
           <torusGeometry args={[5, 0.07, 10, 80]} />
           <meshStandardMaterial color={c.color} emissive={c.color}
@@ -506,7 +442,7 @@ function ZoneCore({ oc }: { oc: OC | null }) {
         const a = (i / 8) * Math.PI * 2;
         const R = 14;
         return (
-          <group key={n.k} position={[Math.sin(a) * R, 0.7, -44 + Math.cos(a) * R * 0.7]}>
+          <group key={n.k} position={[Math.sin(a) * R, 0.7, -22 + Math.cos(a) * R * 0.7]}>
             <mesh position={[0, 0.4, 0]}>
               <cylinderGeometry args={[0.4, 0.45, 0.8, 10]} />
               <meshStandardMaterial color="#1a0a2e" roughness={0.25} metalness={0.85} />
@@ -525,7 +461,7 @@ function ZoneCore({ oc }: { oc: OC | null }) {
           </group>
         );
       })}
-      <group position={[0, 4.5, -48.5]}>
+      <group position={[0, 4.5, -31]}>
         <mesh position={[0, 0, -0.15]}>
           <boxGeometry args={[28, 10, 0.18]} />
           <meshStandardMaterial color="#0a051a" roughness={0.18} metalness={0.75} />
@@ -535,11 +471,11 @@ function ZoneCore({ oc }: { oc: OC | null }) {
           subText={oc ? `GW: ${oc.gateway?.reachable ? 'ONLINE · ' + oc.gateway.latency + 'ms' : 'OFFLINE'} · MEM: ${oc.memory?.files ?? 0}` : 'CONNECTING...'}
           color={c.color} />
       </group>
-      <Text position={[0, 0.1, -44]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.1, -22]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
         6F · OpenClaw 机房
       </Text>
-      <pointLight position={[0, 7, -44]}  color={c.color} intensity={6} distance={42} />
-      <pointLight position={[0, 4, -51]}  color="#E879F9" intensity={2.5} distance={20} />
+      <pointLight position={[0, 7, -22]}  color={c.color} intensity={6} distance={42} />
+      <pointLight position={[0, 4, -31]}  color="#E879F9" intensity={2.5} distance={20} />
     </group>
   );
 }
@@ -555,13 +491,12 @@ function ZoneArchive() {
     { l: 'PROJECT DOCS',   col: '#60A5FA' },
     { l: 'SYSTEM DOCS',    col: '#FBBF24' },
   ];
-
   return (
     <group>
-      <ScreenMesh position={[0, 3.8, -43]} w={50} h={7}
+      <ScreenMesh position={[0, 3.8, -15]} w={50} h={7}
         text="ARCHIVE CENTER" subText="DOCUMENT REPOSITORY · KNOWLEDGE MANAGEMENT" color={c.color} />
       {rows.map((row, ri) => {
-        const z = -38 - ri * 4;
+        const z = -18 - ri * 4;
         return (
           <group key={ri} position={[0, 0, z]}>
             <Text position={[-22, 2.8, 0]} fontSize={0.45} color={row.col} anchorX="left" anchorY="middle">
@@ -593,58 +528,38 @@ function ZoneArchive() {
           </group>
         );
       })}
-      <Text position={[0, 0.1, -43]} fontSize={1.0} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.1, -15]} fontSize={1.0} color={c.color} anchorX="center" anchorY="middle">
         5F · 档案中心
       </Text>
-      <pointLight position={[0, 5, -48]} color={c.color} intensity={3} distance={28} />
+      <pointLight position={[0, 5, -18]} color={c.color} intensity={3} distance={28} />
     </group>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────
-// ALL WALLS
-// ─────────────────────────────────────────────────────────────────
-function AllWalls() {
-  return (
-    <group>
-      {/* 外墙 */}
-      <Wall x1={-30} z1={30}  x2={30}  z2={30}  />
-      <Wall x1={-30} z1={30}  x2={-30} z2={-55} />
-      <Wall x1={30}  z1={30}  x2={30}  z2={-55} />
-      <Wall x1={-30} z1={-55} x2={30}  z2={-55} />
-      {/* Lobby 与下层区域的分隔 */}
-      <Wall x1={-30} z1={-8}  x2={30}  z2={-8}  />
-      {/* HR/Project 与 Command 的分隔 */}
-      <Wall x1={-30} z1={-18} x2={-10} z2={-18} />
-      <Wall x1={10}  z1={-18} x2={30}  z2={-18} />
-      {/* Command 与 Archive 的分隔 */}
-      <Wall x1={-30} z1={-35} x2={30}  z2={-35} />
-      {/* X 方向分隔墙：HR | Command | Project */}
-      <Wall x1={-10} z1={-8}  x2={-10} z2={-35} />
-      <Wall x1={10}  z1={-8}  x2={10}  z2={-35} />
-    </group>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-// CAMPUS FLOOR — one continuous canvas-textured mesh
+// CAMPUS FLOOR — 6 个楼层各自的地面（拼接）
 // ─────────────────────────────────────────────────────────────────
 function CampusFloor() {
   return (
-    <mesh position={[0, 0, -12]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[60, 85]} />
-      <meshStandardMaterial
-        map={floorCanvasTex}
-        roughness={0.5}
-        metalness={0.85}
-        side={THREE.FrontSide}
-      />
-    </mesh>
+    <>
+      {FLOORS.map(f => (
+        <mesh key={f.id} position={[FLOOR_X[f.id], 0, -12]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[60, 60]} />
+          <meshStandardMaterial
+            color={f.color}
+            roughness={0.5}
+            metalness={0.85}
+            emissive={f.color}
+            emissiveIntensity={0.04}
+          />
+        </mesh>
+      ))}
+    </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────
-// SCENE
+// SCENE — 6 楼层横向拼接
 // ─────────────────────────────────────────────────────────────────
 function Scene({ oc }: { oc: OC | null }) {
   return (
@@ -654,26 +569,80 @@ function Scene({ oc }: { oc: OC | null }) {
 
       <CampusFloor />
 
-      <ZoneLobby />
-      <ZoneHR />
-      <ZoneProject />
-      <ZoneCommand />
-      <ZoneCore oc={oc} />
-      <ZoneArchive />
+      {/* 1F Lobby (x=0) */}
+      <group position={[FLOOR_X['1f'], 0, 0]}>
+        <ZoneLobby />
+        {/* 1F 外墙 */}
+        <Wall x1={-30} z1={25} x2={30}  z2={25}  />
+        <Wall x1={-30} z1={25} x2={-30} z2={-55} />
+        <Wall x1={30}  z1={25} x2={30}  z2={-55} />
+        <Wall x1={-30} z1={-55} x2={30} z2={-55} />
+      </group>
 
-      <AllWalls />
+      {/* 2F HR (x=80) */}
+      <group position={[FLOOR_X['2f'], 0, 0]}>
+        <ZoneHR />
+        <Wall x1={-30} z1={5}  x2={30}  z2={5}  />
+        <Wall x1={-30} z1={5}  x2={-30} z2={-55} />
+        <Wall x1={30}  z1={5}  x2={30}  z2={-55} />
+        <Wall x1={-30} z1={-55} x2={30} z2={-55} />
+        <Wall x1={-10} z1={5}  x2={-10} z2={-55} />
+      </group>
+
+      {/* 3F Project (x=160) */}
+      <group position={[FLOOR_X['3f'], 0, 0]}>
+        <ZoneProject />
+        <Wall x1={-30} z1={5}  x2={30}  z2={5}  />
+        <Wall x1={-30} z1={5}  x2={-30} z2={-55} />
+        <Wall x1={30}  z1={5}  x2={30}  z2={-55} />
+        <Wall x1={-30} z1={-55} x2={30} z2={-55} />
+        <Wall x1={10}  z1={5}  x2={10}  z2={-55} />
+      </group>
+
+      {/* 4F Command (x=240) */}
+      <group position={[FLOOR_X['4f'], 0, 0]}>
+        <ZoneCommand />
+        <Wall x1={-30} z1={5}  x2={30}  z2={5}  />
+        <Wall x1={-30} z1={5}  x2={-30} z2={-55} />
+        <Wall x1={30}  z1={5}  x2={30}  z2={-55} />
+        <Wall x1={-30} z1={-55} x2={30} z2={-55} />
+        <Wall x1={-10} z1={5}  x2={-10} z2={-55} />
+        <Wall x1={10}  z1={5}  x2={10}  z2={-55} />
+      </group>
+
+      {/* 5F Archive (x=310) */}
+      <group position={[FLOOR_X['5f'], 0, 0]}>
+        <ZoneArchive />
+        <Wall x1={-30} z1={5}  x2={30}  z2={5}  />
+        <Wall x1={-30} z1={5}  x2={-30} z2={-55} />
+        <Wall x1={30}  z1={5}  x2={30}  z2={-55} />
+        <Wall x1={-30} z1={-55} x2={30} z2={-55} />
+      </group>
+
+      {/* 6F Core (x=380) */}
+      <group position={[FLOOR_X['6f'], 0, 0]}>
+        <ZoneCore oc={oc} />
+        <Wall x1={-30} z1={5}  x2={30}  z2={5}  />
+        <Wall x1={-30} z1={5}  x2={-30} z2={-55} />
+        <Wall x1={30}  z1={5}  x2={30}  z2={-55} />
+        <Wall x1={-30} z1={-55} x2={30} z2={-55} />
+      </group>
 
       <OrbitControls
-        enablePan enableZoom enableRotate
-        minDistance={15} maxDistance={150}
-        minPolarAngle={0.05} maxPolarAngle={Math.PI / 2.05}
+        enablePan
+        enableZoom
+        enableRotate={false}
+        minPolarAngle={Math.PI / 2}
+        maxPolarAngle={Math.PI / 2}
+        minDistance={20}
+        maxDistance={300}
       />
     </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────
-// UI
+// UI OVERLAY
 // ─────────────────────────────────────────────────────────────────
 function UIOverlay({ onBack }: { onBack: () => void }) {
   return (
@@ -681,38 +650,38 @@ function UIOverlay({ onBack }: { onBack: () => void }) {
       <div style={{
         position: 'absolute', top: 16, left: 20, right: 20,
         display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-        pointerEvents: 'auto',
       }}>
-        <div>
-          <div style={{ color: '#F472B6', fontSize: 22, fontWeight: 'bold', letterSpacing: 3 }}>SOLOFORCE · DIGITAL TWIN</div>
-          <div style={{ color: '#60A5FA', fontSize: 13, marginTop: 4 }}>无缝底板 · 数字孪生 · 连续建筑</div>
-        </div>
-        <button onClick={onBack} style={{
-          background: 'rgba(15,25,45,0.85)', border: '1px solid #38BDF8', color: '#38BDF8',
-          padding: '8px 18px', borderRadius: 6, cursor: 'pointer', fontSize: 13, letterSpacing: 1,
-        }}>
-          ← 返回楼层
+        <button
+          onClick={onBack}
+          style={{
+            background: 'rgba(5,10,25,0.7)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8, padding: '8px 16px', color: '#4a6a8a',
+            cursor: 'pointer', fontSize: 11, pointerEvents: 'auto',
+            fontFamily: "'Space Mono', monospace",
+          }}
+        >
+          ← 返回 3D 视图
         </button>
+        <div style={{
+          background: 'rgba(5,10,25,0.7)', border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 8, padding: '8px 16px', color: '#4a6a8a', fontSize: 11,
+        }}>
+          <div style={{ marginBottom: 6, letterSpacing: 2 }}>SOLOFORCE · 楼层总览</div>
+          {FLOORS.map(f => (
+            <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: f.color, boxShadow: `0 0 6px ${f.color}` }} />
+              <span style={{ color: f.color, fontSize: 11 }}>{f.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
       <div style={{
-        position: 'absolute', bottom: 20, right: 20,
-        background: 'rgba(5,10,25,0.88)', border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 10, padding: '12px 16px', pointerEvents: 'auto',
-      }}>
-        <div style={{ color: '#666', fontSize: 11, marginBottom: 8, letterSpacing: 2 }}>FLOOR MAP</div>
-        {FLOORS.map(f => (
-          <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: f.color, boxShadow: `0 0 6px ${f.color}` }} />
-            <span style={{ color: f.color, fontSize: 11 }}>{f.label}</span>
-          </div>
-        ))}
-      </div>
-      <div style={{
-        position: 'absolute', bottom: 20, left: 20,
+        position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
         background: 'rgba(5,10,25,0.7)', border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: 8, padding: '10px 16px', color: '#666', fontSize: 11, pointerEvents: 'auto',
+        borderRadius: 8, padding: '10px 24px', color: '#666', fontSize: 11,
+        pointerEvents: 'auto', whiteSpace: 'nowrap',
       }}>
-        🖱️ 左键拖拽旋转 · 滚轮缩放 · 右键平移
+        🖱️ 拖拽平移 · 滚轮缩放 · 点击区域查看详情
       </div>
     </div>
   );
@@ -746,7 +715,6 @@ export default function FloorFlatDemo() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#030810', position: 'relative' }}>
-      {/* 加载中骨架 */}
       {isLoading && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 20,
@@ -754,29 +722,34 @@ export default function FloorFlatDemo() {
           background: '#030810', gap: 16,
         }}>
           <div style={{ fontSize: 48, opacity: 0.4, animation: 'pulse 1.5s ease-in-out infinite' }}>◈</div>
-          <div style={{ color: '#4a6a8a', fontSize: 13, fontFamily: "'Space Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ color: '#4a6a8a', fontSize: 13, letterSpacing: 2 }}>
             LOADING SOLOFORCE...
           </div>
           <style>{`@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.9} }`}</style>
         </div>
       )}
-      {/* API 错误 Banner */}
       {ocError && !isLoading && (
         <div style={{
           position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
           zIndex: 30, padding: '8px 20px',
           background: 'rgba(239,68,68,0.15)', border: '1px solid #EF4444',
           borderRadius: 8, color: '#EF4444', fontSize: 12,
-          fontFamily: "'Space Mono', monospace", whiteSpace: 'nowrap',
+          whiteSpace: 'nowrap',
         }}>
           ⚠ OPENCLAW API 离线 — 显示模拟数据
         </div>
       )}
       <Canvas
-        camera={{ position: [0, 70, 85], fov: 48 }}
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl }) => { gl.setClearColor('#030810'); }}
       >
+        <OrthographicCamera
+          makeDefault
+          position={[200, 120, 0]}
+          zoom={1.2}
+          near={0.1}
+          far={1000}
+        />
         <Scene oc={oc} />
       </Canvas>
       <UIOverlay onBack={() => navigate('/')} />

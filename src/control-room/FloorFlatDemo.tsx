@@ -2684,9 +2684,21 @@ function UIOverlay({ onBack }: { onBack: () => void }) {
       <div style={{ position: 'absolute', top: 16, left: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
         <button
           onClick={onBack}
-          style={{ pointerEvents: 'auto', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}
+          style={{
+            pointerEvents: 'auto',
+            background: 'rgba(10,15,30,0.9)',
+            border: '1px solid #38BDF8',
+            color: '#38BDF8',
+            padding: '8px 18px',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontSize: 13,
+            fontFamily: "'Space Mono', monospace",
+            boxShadow: '0 0 12px #38BDF840',
+            backdropFilter: 'blur(8px)',
+          }}
         >
-          ← 地图
+          ← 返回地图
         </button>
         <div style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 14px', color: '#fff', fontSize: 12 }}>
           🗺️ 平铺总览

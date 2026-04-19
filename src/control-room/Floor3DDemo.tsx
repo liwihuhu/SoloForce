@@ -19,36 +19,10 @@ function getFloorIndex(floorId: string) {
   return FLOORS.findIndex(f => f.id === floorId);
 }
 
-// 员工数据缓存（模块级）
-interface FloorEmployee {
-  id: string;
-  name: string;
-  type: string;
-  status: 'idle' | 'busy' | 'offline';
-  department?: string;
-  roleName?: string;
-  tasksCompleted?: number;
-  efficiency?: number;
-}
-const floorEmployeesCache: { data: FloorEmployee[]; ts: number } = { data: [], ts: 0 };
+// Shared floor config (imported)
+import { FLOORS, FLOOR_XZ, FLOOR_HEIGHT } from './floorConfigs';
+import { type FloorEmployee, floorEmployeesCache, dispatchEmployeeSelect } from './employeeState';
 
-// 派发员工选中事件（供外部监听跳转）
-function dispatchEmployeeSelect(employeeId: string) {
-  window.dispatchEvent(new CustomEvent('floor-employee-select', { detail: { employeeId } }));
-}
-
-// ===========================================
-// 楼层配置
-// ===========================================
-const FLOORS = [
-  { id: '1f', label: '1F 大厅',     color: '#38BDF8', floorColor: '#0c1a2e', wallColor: '#1e3a5f', glowColor: '#38BDF8' },
-  { id: '2f', label: '2F 人事部',    color: '#4ADE80', floorColor: '#0c1e12', wallColor: '#1e4a2a', glowColor: '#4ADE80' },
-  { id: '3f', label: '3F 项目组',    color: '#60A5FA', floorColor: '#0c0e1e', wallColor: '#1e2a4a', glowColor: '#60A5FA' },
-  { id: '4f', label: '4F 任务大厅',  color: '#FBBF24', floorColor: '#1e1a0c', wallColor: '#4a4a1e', glowColor: '#FBBF24' },
-  { id: '5f', label: '5F 档案中心',  color: '#A3E635', floorColor: '#0c1e0c', wallColor: '#2a4a1e', glowColor: '#A3E635' },
-  { id: '6f', label: '6F OpenClaw机房', color: '#F472B6', floorColor: '#1e0c1e', wallColor: '#4a1e4a', glowColor: '#F472B6' },
-];
-const FLOOR_HEIGHT = 3;
 
 // ===========================================
 // 办公室桌

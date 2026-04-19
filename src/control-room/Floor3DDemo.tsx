@@ -2456,38 +2456,46 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
               {/* Node point light */}
               <pointLight intensity={1.2} color={sc} distance={5} />
 
-              {/* 前方信息屏 — 屏幕向外斜靠核心30° */}
-              <group position={[0, 0.2, -0.7]} rotation={[-Math.PI / 6, -angle, 0]}>
-                {/* 屏幕背景 */}
-                <mesh position={[0, 0, 0]}>
-                  <planeGeometry args={[1.0, 0.65]} />
-                  <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={color} emissiveIntensity={0.06} transparent opacity={0.92} />
-                </mesh>
-                {/* 屏幕边框发光 */}
-                <mesh position={[0, 0, -0.002]}>
-                  <planeGeometry args={[1.05, 0.7]} />
-                  <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} transparent opacity={0.5} />
-                </mesh>
-                {/* 状态指示条 */}
-                <mesh position={[0, 0.3, 0.001]}>
-                  <planeGeometry args={[0.9, 0.04]} />
-                  <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.0} />
-                </mesh>
-                {/* 数据显示 */}
-                <Text position={[0, 0.06, 0.002]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
-                  {data ? String(data.value1) : '--'}
-                </Text>
-                <Text position={[0, -0.14, 0.002]} fontSize={0.09} color={color} anchorX="center" anchorY="middle" fillOpacity={0.7}>
-                  {data?.unit || ''}
-                </Text>
-              </group>
-
               {/* Floating label below */}
               <Text position={[0, -0.95, 0]} fontSize={0.22} color={color} anchorX="center" anchorY="middle">
                 {label}
               </Text>
               <Text position={[0, -0.95 + 0.28, 0]} fontSize={0.11} color={color} anchorX="center" anchorY="middle" fillOpacity={0.6}>
                 {data ? String(data.value1) : '--'} {data?.unit || ''}
+              </Text>
+            </group>
+          );
+        })}
+
+        {/* ===== 终端外侧屏幕阵列 — 8块屏幕环绕核心 ===== */}
+        {terminalNodes.map(({ angle, color, key }, i) => {
+          const sx = Math.sin(angle) * (RING_RADIUS + 1.0);
+          const sz = Math.cos(angle) * (RING_RADIUS + 1.0);
+          const data = terminalData?.[key];
+          const sc = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
+          return (
+            <group key={key} position={[sx, 1.5, sz]} rotation={[0, angle, 0]}>
+              {/* 屏幕主体 */}
+              <mesh position={[0, 0, 0]}>
+                <boxGeometry args={[1.4, 0.85, 0.05]} />
+                <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={color} emissiveIntensity={0.08} />
+              </mesh>
+              {/* 四边框发光 */}
+              <mesh position={[0, 0, 0.028]}>
+                <boxGeometry args={[1.45, 0.9, 0.01]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} transparent opacity={0.5} />
+              </mesh>
+              {/* 状态条 */}
+              <mesh position={[0, 0.36, 0.035]}>
+                <planeGeometry args={[1.2, 0.06]} />
+                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.5} />
+              </mesh>
+              {/* 数据文字 */}
+              <Text position={[0, 0.06, 0.036]} fontSize={0.22} color={color} anchorX="center" anchorY="middle">
+                {data ? String(data.value1) : '--'}
+              </Text>
+              <Text position={[0, -0.22, 0.036]} fontSize={0.12} color={color} anchorX="center" anchorY="middle" fillOpacity={0.7}>
+                {data?.unit || ''}
               </Text>
             </group>
           );

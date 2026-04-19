@@ -2308,31 +2308,31 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
       LOADED: '#22C55E', READY: '#22C55E',
     };
 
-    // Neural core ref (for breathing + slow rotation)
-    const neuralRef = useRef<THREE.Group>(null!);
-    const neuralElapsedRef = useRef(0);
+    // 核心引用 (呼吸 + 旋转动画)
+    const coreRef = useRef<THREE.Group>(null!);
+    const coreElapsedRef = useRef(0);
     useFrame((_, delta) => {
-      if (!neuralRef.current) return;
-      neuralElapsedRef.current += delta;
-      const t = neuralElapsedRef.current;
-      // Slow Y-axis rotation of entire neural core
-      neuralRef.current.rotation.y = t * 0.18;
-      // Inner sphere breathing
+      if (!coreRef.current) return;
+      coreElapsedRef.current += delta;
+      const t = coreElapsedRef.current;
+      // 核心自转
+      coreRef.current.rotation.y = t * 0.18;
+      // 内核呼吸
       const b = Math.sin(t * 1.2) * 0.07 + 1.0;
-      neuralRef.current.children.forEach(child => {
+      coreRef.current.children.forEach(child => {
         if (child instanceof THREE.Mesh && child.geometry.type === 'SphereGeometry') {
           child.scale.setScalar(b);
         }
       });
     });
 
-    // Terminal node refs for floating animation
-    const nodeRefs = useRef<(THREE.Group | null)[]>([]);
-    const nodeElapsedRef = useRef(0);
+    // 终端节点引用 (浮动动画)
+    const terminalRefs = useRef<(THREE.Group | null)[]>([]);
+    const terminalElapsedRef = useRef(0);
     useFrame((_, delta) => {
-      nodeElapsedRef.current += delta;
-      const t = nodeElapsedRef.current;
-      nodeRefs.current.forEach((ref, i) => {
+      terminalElapsedRef.current += delta;
+      const t = terminalElapsedRef.current;
+      terminalRefs.current.forEach((ref, i) => {
         if (!ref) return;
         const offset = i * (Math.PI * 2 / 8);
         // Gentle vertical float
@@ -2340,7 +2340,7 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
       });
     });
 
-    const neuralNodes: Array<{ angle: number; color: string; label: string; key: 'ME' | 'AGENTS' | 'GATEWAY' | 'TASKS' | 'MEMORY' | 'SESSIONS' | 'SKILLS' | 'MCP'; isMe: boolean }> = [
+    const terminalNodes: Array<{ angle: number; color: string; label: string; key: 'ME' | 'AGENTS' | 'GATEWAY' | 'TASKS' | 'MEMORY' | 'SESSIONS' | 'SKILLS' | 'MCP'; isMe: boolean }> = [
       { angle: 0,          color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
       { angle: Math.PI / 4,       color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
       { angle: Math.PI / 2,       color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
@@ -2374,7 +2374,7 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
           <meshStandardMaterial color="#0d2040" transparent opacity={0.35} depthWrite={false} />
         </mesh>
 
-        {/* Subtle concentric glow rings on floor */}
+        {/* 核心内核地板光圈 */}
         {[2.5, 5.0, 7.5].map((r, i) => (
           <mesh key={i} position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[r - 0.04, r + 0.04, 48]} />
@@ -2388,10 +2388,10 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
         <pointLight position={[-6, 3, 4]} intensity={1.5} color={'#60A5FA'} distance={12} />
         <pointLight position={[6, 3, -4]} intensity={1.5} color={'#A78BFA'} distance={12} />
 
-        {/* ===== NEURAL CORE (Dodecahedron + satellites) ===== */}
-        <group ref={neuralRef} position={[0, 2.2, 0]}>
+        {/* ===== 核心 (Core) ===== */}
+        <group ref={coreRef} position={[0, 2.2, 0]}>
 
-          {/* Main neural body — dodecahedron (organic polyhedron) */}
+          {/* 核心主体 — 十二面体 */}
           <mesh>
             <dodecahedronGeometry args={[1.2, 0]} />
             <meshStandardMaterial
@@ -2403,7 +2403,7 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
             />
           </mesh>
 
-          {/* Inner glowing core */}
+          {/* 核心发光内核 */}
           <mesh>
             <sphereGeometry args={[0.55, 16, 16]} />
             <meshStandardMaterial
@@ -2415,7 +2415,7 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
             />
           </mesh>
 
-          {/* 12 vertex glow nodes (synaptic points) */}
+          {/* 十二顶点发光节点 */}
           {[[0,0,1.2],[0,0,-1.2],[0,1.2,0],[0,-1.2,0],[1.2,0,0],[-1.2,0,0],
             [0.75,0.75,0.75],[-0.75,0.75,0.75],[0.75,-0.75,0.75],[-0.75,-0.75,0.75],
             [0,0.75,0.75],[0,-0.75,0.75]].map((pos, i) => (
@@ -2441,8 +2441,8 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
 
         </group>
 
-        {/* ===== NEURAL TERMINAL NODES (8 floating nodes around core) ===== */}
-        {neuralNodes.map(({ angle, color, label, key, isMe }, i) => {
+        {/* ===== 终端节点 (Terminal Nodes) ===== */}
+        {terminalNodes.map(({ angle, color, label, key, isMe }, i) => {
           const nx = Math.sin(angle) * RING_RADIUS;
           const nz = Math.cos(angle) * RING_RADIUS;
           const data = terminalData?.[key];
@@ -2450,10 +2450,10 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
           return (
             <group
               key={label}
-              ref={el => { nodeRefs.current[i] = el; }}
+              ref={el => { terminalRefs.current[i] = el; }}
               position={[nx, 1.2, nz]}
             >
-              {/* Node body — icosahedron for organic feel */}
+              {/* 终端主体 — 二十面体 */}
               <mesh>
                 <icosahedronGeometry args={[isMe ? 0.65 : 0.5, 1]} />
                 <meshStandardMaterial

@@ -1876,7 +1876,7 @@ function ZoneCommand() {
     <Text
       position={[0, 0.008, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
-      fontSize={6}
+      fontSize={4}
       color={c.glowColor}
       anchorX="center"
       anchorY="middle"

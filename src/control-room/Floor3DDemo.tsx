@@ -2485,19 +2485,13 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
               {/* Node point light */}
               <pointLight intensity={1.2} color={sc} distance={5} />
 
-              {/* Floating label below */}
-              <Text position={[0, -0.95, 0]} fontSize={0.22} color={color} anchorX="center" anchorY="middle">
-                {label}
-              </Text>
-              <Text position={[0, -0.95 + 0.28, 0]} fontSize={0.11} color={color} anchorX="center" anchorY="middle" fillOpacity={0.6}>
-                {data ? String(data.value1) : '--'} {data?.unit || ''}
-              </Text>
+
             </group>
           );
         })}
 
         {/* ===== 终端外侧屏幕阵列 — 8块屏幕环绕核心 ===== */}
-        {terminalNodes.map(({ angle, color, key }, i) => {
+        {terminalNodes.map(({ angle, color, key, label }, i) => {
           const sx = Math.sin(angle) * (RING_RADIUS + 1.0);
           const sz = Math.cos(angle) * (RING_RADIUS + 1.0);
           const data = terminalData?.[key];
@@ -2525,6 +2519,10 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
               </Text>
               <Text position={[0, -0.22, 0.036]} fontSize={0.12} color={color} anchorX="center" anchorY="middle" fillOpacity={0.7}>
                 {data?.unit || ''}
+              </Text>
+              {/* 终端名字 — 贴在屏幕下方 */}
+              <Text position={[0, -0.62, 0.036]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
+                {label}
               </Text>
             </group>
           );

@@ -30,7 +30,7 @@ const FLOOR_XZ: Record<string, [number, number]> = {
   '3f': [-30,   0],  // 3F 项目组
   '4f': [  0,   0],  // 4F 任务大厅
   '5f': [  0, -55],  // 5F 档案中心
-  '6f': [  0, -25],  // 6F OpenClaw
+  '6f': [  0, -40],  // 6F OpenClaw
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -2044,11 +2044,11 @@ function ZoneArchive() {
   <group position={[0, 0, 0]}>
     {/* Floor */}
     <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[20, 12]} />
+      <planeGeometry args={[30, 24]} />
       <meshStandardMaterial color={c.floorColor} roughness={0.25} metalness={0.4} emissive={c.glowColor} emissiveIntensity={0.05} />
     </mesh>
     <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[20, 12]} />
+      <planeGeometry args={[30, 24]} />
       <meshStandardMaterial color={c.glowColor} transparent opacity={0.1} depthWrite={false} />
     </mesh>
 
@@ -2367,14 +2367,14 @@ function ZoneCore() {
     { angle: Math.PI * 7 / 4,   color: '#FB923C', label: 'MCP',      key: 'MCP',      isMe: false },
   ];
 
-  const RING_RADIUS = 4.8;
+  const RING_RADIUS = 7.2;
 
   return (
     <group position={[0, 0, 0]}>
 
       {/* ===== Floor: organic cell texture ===== */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 16]} />
+        <planeGeometry args={[30, 24]} />
         <meshStandardMaterial
           color="#060d18"
           roughness={0.15}
@@ -2387,12 +2387,12 @@ function ZoneCore() {
       </mesh>
       {/* Organic hex grid overlay */}
       <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 12]} />
+        <planeGeometry args={[30, 24]} />
         <meshStandardMaterial color="#0d2040" transparent opacity={0.35} depthWrite={false} />
       </mesh>
 
       {/* Subtle concentric glow rings on floor */}
-      {[2.5, 5.0, 7.5].map((r, i) => (
+      {[3.75, 7.5, 11.25].map((r, i) => (
         <mesh key={i} position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[r - 0.04, r + 0.04, 48]} />
           <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={0.3 - i * 0.08} transparent opacity={0.4 - i * 0.1} side={THREE.DoubleSide} />
@@ -2559,10 +2559,10 @@ function ZoneCore() {
       })}
 
       {/* ── 6F 四边框发光条 ── */}
-      <mesh position={[-10, 0.01, 0]}><boxGeometry args={[0.1, 0.08, 16]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
-      <mesh position={[10, 0.01, 0]}><boxGeometry args={[0.1, 0.08, 16]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
-      <mesh position={[0, 0.01, -8]}><boxGeometry args={[20, 0.08, 0.1]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
-      <mesh position={[0, 0.01, 8]}><boxGeometry args={[20, 0.08, 0.1]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+      <mesh position={[-15, 0.01, 0]}><boxGeometry args={[0.1, 0.08, 24]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+      <mesh position={[15, 0.01, 0]}><boxGeometry args={[0.1, 0.08, 24]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+      <mesh position={[0, 0.01, -12]}><boxGeometry args={[30, 0.08, 0.1]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
+      <mesh position={[0, 0.01, 12]}><boxGeometry args={[30, 0.08, 0.1]} /><meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} /></mesh>
     </group>
   );
 }

@@ -516,12 +516,6 @@ export default function App() {
         >
           任务中心
         </NavLink>
-        <NavLink
-          active={currentPage === '/flat'}
-          onClick={() => navigate('/flat')}
-        >
-          🗺️ 平铺总览
-        </NavLink>
         
         {/* 设置按钮 */}
         <button

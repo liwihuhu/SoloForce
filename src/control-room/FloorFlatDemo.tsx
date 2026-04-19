@@ -82,17 +82,17 @@ function buildFloorTexture(): HTMLCanvasElement {
     ctx.stroke();
   }
 
-  // ZONES — coordinates match world exactly, overlaps eliminate gaps
-  // 1F Lobby — wide front pentagon
-  fillZone([[-30, 30], [30, 30], [30, -2], [10, -2], [-10, -2]], '#0c1628', 5);
-  // 2F HR — left rectangle
-  fillZone([[-30, -2], [-10, -2], [-10, -18], [-30, -18]], '#0c1e12', 4);
-  // 3F Project — right rectangle
-  fillZone([[10, -2], [30, -2], [30, -18], [10, -18]], '#0c0e28', 4);
-  // 4F Command — center rectangle
-  fillZone([[-10, -2], [10, -2], [10, -18], [-10, -18]], '#1a1a0c', 4);
-  // 6F Core — octagon (oversized slightly for coverage)
-  const R = 15, CZ = -24;
+  // ZONES — 新布局：4F+6F 占 55%，1F+5F 压缩
+  // 1F Lobby — 压缩到 Z=30→-8（高22，占26%）
+  fillZone([[-30, 30], [30, 30], [30, -8], [10, -8], [-10, -8]], '#0c1628', 5);
+  // 2F HR — 左矩形 Z=-8→-18
+  fillZone([[-30, -8], [-10, -8], [-10, -18], [-30, -18]], '#0c1e12', 4);
+  // 3F Project — 右矩形 Z=-8→-18
+  fillZone([[10, -8], [30, -8], [30, -18], [10, -18]], '#0c0e28', 4);
+  // 4F Command — 扩展到 Z=-8→-35（高27，占32%）
+  fillZone([[-10, -8], [10, -8], [10, -35], [-10, -35]], '#1a1a0c', 4);
+  // 6F Core — 扩大 octagon R=18，中心 Z=-44（占高23+，约27%）
+  const R = 18, CZ = -44;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
     const next = ((i + 1) / 8) * Math.PI * 2 - Math.PI / 8;
@@ -112,8 +112,8 @@ function buildFloorTexture(): HTMLCanvasElement {
     i === 0 ? ctx.moveTo(x, z) : ctx.lineTo(x, z);
   }
   ctx.closePath(); ctx.fill();
-  // 5F Archive — wide rectangle back
-  fillZone([[-28, -30], [28, -30], [28, -55], [-28, -55]], '#0c1e0c', 4);
+  // 5F Archive — 压缩到 Z=-35→-55（高20，占24%）
+  fillZone([[-28, -35], [28, -35], [28, -55], [-28, -55]], '#0c1e0c', 4);
 
   return cv;
 }
@@ -188,7 +188,7 @@ function ZoneLobby() {
   return (
     <group>
       {[-20, -13, -6, 0, 6, 13, 20].map((x, i) => (
-        <group key={i} position={[x, 0, 24]}>
+        <group key={i} position={[x, 0, 11]}>
           <mesh position={[0, 1.5, 0]}>
             <boxGeometry args={[0.45, 3, 0.12]} />
             <meshStandardMaterial color={c.color} emissive={c.color} emissiveIntensity={2.5} roughness={0.15} metalness={0.85} />
@@ -199,34 +199,34 @@ function ZoneLobby() {
           </mesh>
         </group>
       ))}
-      <mesh position={[0, 0.6, 12]}>
+      <mesh position={[0, 0.6, 3]}>
         <boxGeometry args={[16, 1.2, 2.2]} />
         <meshStandardMaterial color="#1e3a5f" roughness={0.25} metalness={0.75} emissive={c.color} emissiveIntensity={0.35} />
       </mesh>
-      <ScreenMesh position={[0, 1.9, 11.2]} w={14} h={3.5}
+      <ScreenMesh position={[0, 1.9, 2.2]} w={14} h={3.5}
         text="RECEPTION" subText={`VISITORS: ${vis}`} color={c.color} />
-      <ScreenMesh position={[0, 4, 28.2]} rotation={[0, Math.PI, 0]} w={56} h={10}
+      <ScreenMesh position={[0, 4, 14]} rotation={[0, Math.PI, 0]} w={56} h={10}
         text="WELCOME TO SOLOFORCE" subText="数字孪生 · 智慧协同 · 创新未来" color={c.color} />
-      <ScreenMesh position={[-2, 3.5, -2.2]} w={18} h={7}
+      <ScreenMesh position={[-2, 3.5, -5]} w={18} h={7}
         text="SOLOFORCE" subText="DIGITAL TWIN HQ" color={c.color} />
-      {[[-24, 16], [-24, 0], [24, 16], [24, 0]].map(([x, z], i) => (
+      {[[-24, 8], [-24, -4], [24, 8], [24, -4]].map(([x, z], i) => (
         <mesh key={i} position={[x, 1.75, z]}>
           <cylinderGeometry args={[0.4, 0.4, 3.5, 12]} />
           <meshStandardMaterial color="#1e3a5f" roughness={0.3} metalness={0.8} emissive={c.color} emissiveIntensity={0.2} />
         </mesh>
       ))}
-      {[[-16, 4], [0, 4], [16, 4]].map(([x, z], i) => (
+      {[[-16, -1], [0, -1], [16, -1]].map(([x, z], i) => (
         <mesh key={i} position={[x, 0.3, z]}>
           <boxGeometry args={[6, 0.6, 1.4]} />
           <meshStandardMaterial color="#1a2a4a" roughness={0.35} metalness={0.7} emissive={c.color} emissiveIntensity={0.1} />
         </mesh>
       ))}
-      <Text position={[0, 0.1, 26]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.1, 13]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
         1F · 大厅
       </Text>
-      <pointLight position={[0, 6, 14]}  color={c.color} intensity={4}  distance={40} />
-      <pointLight position={[-20, 4, 20]} color={c.color} intensity={1.5} distance={16} />
-      <pointLight position={[20,  4, 20]} color={c.color} intensity={1.5} distance={16} />
+      <pointLight position={[0, 6, 5]}   color={c.color} intensity={4}  distance={40} />
+      <pointLight position={[-20, 4, 12]} color={c.color} intensity={1.5} distance={16} />
+      <pointLight position={[20,  4, 12]} color={c.color} intensity={1.5} distance={16} />
     </group>
   );
 }
@@ -282,7 +282,7 @@ function ZoneHR() {
 
   return (
     <group>
-      <group position={[-19, 3.8, -17]}>
+      <group position={[-19, 3.8, -13]}>
         <mesh position={[0, 0, -0.12]}>
           <boxGeometry args={[16, 8.5, 0.15]} />
           <meshStandardMaterial color="#0a1828" roughness={0.28} metalness={0.72} />
@@ -291,7 +291,7 @@ function ZoneHR() {
           text={loadError ? 'HR DEPT — API ERROR' : 'HR DEPT'}
           subText={loadError ? '请检查后端服务' : `STAFF: ${emps.length}/12`} color={loadError ? '#EF4444' : c.color} />
       </group>
-      {[-5, -9, -14].map((z, i) => (
+      {[-10, -13, -16].map((z, i) => (
         <mesh key={i} position={[-19, 0.04, z]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[16, 3.5]} />
           <meshStandardMaterial color={HR_AREA_COLORS[i]}
@@ -303,10 +303,10 @@ function ZoneHR() {
         <Station key={emp.id} position={positions[i]}
           color={EMP_COLORS[emp.type] || c.color} status={emp.status} />
       ))}
-      <Text position={[-19, 0.1, -1]} fontSize={0.9} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[-19, 0.1, -8]} fontSize={0.9} color={c.color} anchorX="center" anchorY="middle">
         2F · 人事部
       </Text>
-      <pointLight position={[-19, 5, -10]} color={c.color} intensity={3} distance={22} />
+      <pointLight position={[-19, 5, -13]} color={c.color} intensity={3} distance={22} />
     </group>
   );
 }
@@ -319,9 +319,9 @@ function ZoneProject() {
 
   return (
     <group>
-      <ScreenMesh position={[19, 3.8, -17]} rotation={[0, Math.PI, 0]} w={16} h={8}
+      <ScreenMesh position={[19, 3.8, -13]} rotation={[0, Math.PI, 0]} w={16} h={8}
         text="PROJECT TEAMS" subText="4 ACTIVE · AGILE" color={c.color} />
-      {[[14, -5], [24, -5], [14, -14], [24, -14]].map(([x, z], i) => (
+      {[[14, -9], [24, -9], [14, -16], [24, -16]].map(([x, z], i) => (
         <group key={i} position={[x, 0, z]}>
           <mesh position={[0, 0.4, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[1.4, 32]} />
@@ -369,7 +369,7 @@ function ZoneCommand() {
 
   return (
     <group>
-      <group position={[0, 4.5, -29.2]}>
+      <group position={[0, 4.5, -21]}>
         <mesh position={[0, 0, -0.15]}>
           <boxGeometry args={[20, 10, 0.2]} />
           <meshStandardMaterial color="#0a1a0a" roughness={0.18} metalness={0.75} />
@@ -382,8 +382,13 @@ function ZoneCommand() {
             emissiveIntensity={4} roughness={0.1} metalness={0.9} />
         </mesh>
       </group>
+      {/* KPI 均匀分布在扩大的 command 区域 */}
       {KPI_DATA.map((k, i) => (
-        <group key={k.label} position={KPI_POSITIONS[i]}>
+        <group key={k.label} position={[
+          KPI_POSITIONS[i][0],
+          KPI_POSITIONS[i][1],
+          [-9, -20, -9, -20][i],
+        ]}>
           <mesh position={[0, 1.1, 0]}>
             <boxGeometry args={[4, 2.2, 0.12]} />
             <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.75}
@@ -397,20 +402,20 @@ function ZoneCommand() {
           </Text>
         </group>
       ))}
-      <mesh position={[0, 0.45, -6]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0.45, -28]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[3, 48]} />
         <meshStandardMaterial color="#1a2a1a" roughness={0.18} metalness={0.75}
           emissive={c.color} emissiveIntensity={0.28} />
       </mesh>
-      <mesh position={[0, 0.52, -6]}>
+      <mesh position={[0, 0.52, -28]}>
         <torusGeometry args={[3, 0.08, 8, 64]} />
         <meshStandardMaterial color={c.color} emissive={c.color}
           emissiveIntensity={3.5} roughness={0.1} metalness={0.9} />
       </mesh>
-      <Text position={[0, 0.1, -17]} fontSize={1.0} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.1, -35]} fontSize={1.0} color={c.color} anchorX="center" anchorY="middle">
         4F · 任务大厅
       </Text>
-      <pointLight position={[0, 6, -10]} color={c.color} intensity={5} distance={35} />
+      <pointLight position={[0, 6, -20]} color={c.color} intensity={5} distance={35} />
     </group>
   );
 }
@@ -468,7 +473,7 @@ function ZoneCore({ oc }: { oc: OC | null }) {
 
   return (
     <group>
-      <group ref={coreRef} position={[0, 2.5, -24]}>
+      <group ref={coreRef} position={[0, 2.5, -44]}>
         <mesh>
           <icosahedronGeometry args={[1.4, 3]} />
           <meshStandardMaterial color={c.color} emissive={c.color}
@@ -480,28 +485,28 @@ function ZoneCore({ oc }: { oc: OC | null }) {
             emissiveIntensity={12} transparent opacity={0.7} />
         </mesh>
       </group>
-      <group position={[0, 2.5, -24]}>
+      <group position={[0, 2.5, -44]}>
         <mesh ref={ring1} rotation={[Math.PI / 3, 0, 0]}>
-          <torusGeometry args={[3.5, 0.07, 10, 80]} />
+          <torusGeometry args={[5, 0.07, 10, 80]} />
           <meshStandardMaterial color={c.color} emissive={c.color}
             emissiveIntensity={4} roughness={0.05} metalness={0.97} />
         </mesh>
         <mesh ref={ring2} rotation={[Math.PI / 2, 0.4, 0]}>
-          <torusGeometry args={[6, 0.07, 10, 80]} />
+          <torusGeometry args={[9, 0.07, 10, 80]} />
           <meshStandardMaterial color={c.color} emissive={c.color}
             emissiveIntensity={3} roughness={0.05} metalness={0.97} />
         </mesh>
         <mesh ref={ring3} rotation={[Math.PI / 5, 0.8, 0]}>
-          <torusGeometry args={[8.5, 0.05, 10, 80]} />
+          <torusGeometry args={[13, 0.05, 10, 80]} />
           <meshStandardMaterial color="#E879F9" emissive="#E879F9"
             emissiveIntensity={2} roughness={0.05} metalness={0.97} />
         </mesh>
       </group>
       {nodes.map((n, i) => {
         const a = (i / 8) * Math.PI * 2;
-        const R = 11;
+        const R = 14;
         return (
-          <group key={n.k} position={[Math.sin(a) * R, 0.7, -24 + Math.cos(a) * R * 0.7]}>
+          <group key={n.k} position={[Math.sin(a) * R, 0.7, -44 + Math.cos(a) * R * 0.7]}>
             <mesh position={[0, 0.4, 0]}>
               <cylinderGeometry args={[0.4, 0.45, 0.8, 10]} />
               <meshStandardMaterial color="#1a0a2e" roughness={0.25} metalness={0.85} />
@@ -520,7 +525,7 @@ function ZoneCore({ oc }: { oc: OC | null }) {
           </group>
         );
       })}
-      <group position={[0, 4.5, -31.5]}>
+      <group position={[0, 4.5, -48.5]}>
         <mesh position={[0, 0, -0.15]}>
           <boxGeometry args={[28, 10, 0.18]} />
           <meshStandardMaterial color="#0a051a" roughness={0.18} metalness={0.75} />
@@ -530,11 +535,11 @@ function ZoneCore({ oc }: { oc: OC | null }) {
           subText={oc ? `GW: ${oc.gateway?.reachable ? 'ONLINE · ' + oc.gateway.latency + 'ms' : 'OFFLINE'} · MEM: ${oc.memory?.files ?? 0}` : 'CONNECTING...'}
           color={c.color} />
       </group>
-      <Text position={[0, 0.1, -24]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.1, -44]} fontSize={1.1} color={c.color} anchorX="center" anchorY="middle">
         6F · OpenClaw 机房
       </Text>
-      <pointLight position={[0, 7, -24]}  color={c.color} intensity={6} distance={42} />
-      <pointLight position={[0, 4, -31]}  color="#E879F9" intensity={2.5} distance={20} />
+      <pointLight position={[0, 7, -44]}  color={c.color} intensity={6} distance={42} />
+      <pointLight position={[0, 4, -51]}  color="#E879F9" intensity={2.5} distance={20} />
     </group>
   );
 }
@@ -553,10 +558,10 @@ function ZoneArchive() {
 
   return (
     <group>
-      <ScreenMesh position={[0, 3.8, -30.2]} w={50} h={7}
+      <ScreenMesh position={[0, 3.8, -43]} w={50} h={7}
         text="ARCHIVE CENTER" subText="DOCUMENT REPOSITORY · KNOWLEDGE MANAGEMENT" color={c.color} />
       {rows.map((row, ri) => {
-        const z = -33 - ri * 4.5;
+        const z = -38 - ri * 4;
         return (
           <group key={ri} position={[0, 0, z]}>
             <Text position={[-22, 2.8, 0]} fontSize={0.45} color={row.col} anchorX="left" anchorY="middle">
@@ -588,10 +593,10 @@ function ZoneArchive() {
           </group>
         );
       })}
-      <Text position={[0, 0.1, -30]} fontSize={1.0} color={c.color} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.1, -43]} fontSize={1.0} color={c.color} anchorX="center" anchorY="middle">
         5F · 档案中心
       </Text>
-      <pointLight position={[0, 5, -40]} color={c.color} intensity={3} distance={28} />
+      <pointLight position={[0, 5, -48]} color={c.color} intensity={3} distance={28} />
     </group>
   );
 }
@@ -602,17 +607,21 @@ function ZoneArchive() {
 function AllWalls() {
   return (
     <group>
+      {/* 外墙 */}
       <Wall x1={-30} z1={30}  x2={30}  z2={30}  />
       <Wall x1={-30} z1={30}  x2={-30} z2={-55} />
       <Wall x1={30}  z1={30}  x2={30}  z2={-55} />
       <Wall x1={-30} z1={-55} x2={30}  z2={-55} />
-      <Wall x1={-10} z1={30}  x2={-10} z2={-2}  />
-      <Wall x1={10}  z1={30}  x2={10}  z2={-2}  />
+      {/* Lobby 与下层区域的分隔 */}
+      <Wall x1={-30} z1={-8}  x2={30}  z2={-8}  />
+      {/* HR/Project 与 Command 的分隔 */}
       <Wall x1={-30} z1={-18} x2={-10} z2={-18} />
       <Wall x1={10}  z1={-18} x2={30}  z2={-18} />
-      <Wall x1={-10} z1={-2}  x2={10}  z2={-2}  />
-      <Wall x1={-10} z1={-18} x2={10}  z2={-18} />
-      <Wall x1={-14} z1={-30} x2={14}  z2={-30} />
+      {/* Command 与 Archive 的分隔 */}
+      <Wall x1={-30} z1={-35} x2={30}  z2={-35} />
+      {/* X 方向分隔墙：HR | Command | Project */}
+      <Wall x1={-10} z1={-8}  x2={-10} z2={-35} />
+      <Wall x1={10}  z1={-8}  x2={10}  z2={-35} />
     </group>
   );
 }

@@ -1865,43 +1865,43 @@ function ZoneCommand() {
   <group position={[0, 0, 0]}>
     {/* 地板 */}
     <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[40.5, 31.5]} />
+      <planeGeometry args={[34, 26]} />
       <meshStandardMaterial color={c.floorColor} roughness={0.4} metalness={0.3} emissive={c.glowColor} emissiveIntensity={0.08} />
     </mesh>
     <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[40.5, 31.5]} />
+      <planeGeometry args={[34, 26]} />
       <meshStandardMaterial color={c.glowColor} transparent opacity={0.3} depthWrite={false} />
     </mesh>
 
     {/* ===== 地板发光边框 ===== */}
-    <mesh position={[0, 0.003, -15.75]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[40.5, 0.08]} />
+    <mesh position={[0, 0.003, -13]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[34, 0.08]} />
       <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
     </mesh>
-    <mesh position={[0, 0.003, 15.75]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[40.5, 0.08]} />
+    <mesh position={[0, 0.003, 13]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[34, 0.08]} />
       <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
     </mesh>
-    <mesh position={[-20.25, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
-      <planeGeometry args={[31.5, 0.08]} />
+    <mesh position={[-17, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+      <planeGeometry args={[26, 0.08]} />
       <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
     </mesh>
-    <mesh position={[20.25, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
-      <planeGeometry args={[31.5, 0.08]} />
+    <mesh position={[17, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+      <planeGeometry args={[26, 0.08]} />
       <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
     </mesh>
 
     {/* ===== 主控台 ===== */}
-    <mesh position={[0, 0.7, 8.55]} castShadow receiveShadow>
-      <boxGeometry args={[15.75, 0.06, 3.15]} />
+    <mesh position={[0, 0.7, 7.1]} castShadow receiveShadow>
+      <boxGeometry args={[13, 0.06, 2.6]} />
       <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={c.glowColor} emissiveIntensity={0.06} />
     </mesh>
-    <mesh position={[0, 1.0, 8.55]}>
-      <boxGeometry args={[13.5, 0.83, 0.09]} />
+    <mesh position={[0, 1.0, 7.1]}>
+      <boxGeometry args={[11, 0.83, 0.09]} />
       <meshStandardMaterial color="#0a1520" roughness={0.1} metalness={0.5} emissive={c.glowColor} emissiveIntensity={0.3} />
     </mesh>
     {[-2.85, -1.43, 0, 1.43, 2.85].map((x, i) => (
-      <mesh key={i} position={[x, 1.3, 8.6]}>
+      <mesh key={i} position={[x, 1.3, 7.15]}>
         <boxGeometry args={[0.83, 0.07, 0.01]} />
         <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={i === 2 ? 2.0 : 0.8} />
       </mesh>
@@ -1911,11 +1911,11 @@ function ZoneCommand() {
     {[-8.25, 8.25].map((x, si) => (
       <group key={si} position={[x, 0, 4.5]}>
         <mesh position={[0, 0.7, 0]} castShadow receiveShadow>
-          <boxGeometry args={[6.3, 0.06, 2.7]} />
+          <boxGeometry args={[5.25, 0.06, 2.25]} />
           <meshStandardMaterial color="#1a2a3a" roughness={0.2} metalness={0.7} emissive={c.glowColor} emissiveIntensity={0.06} />
         </mesh>
         <mesh position={[0, 1.0, 0]}>
-          <boxGeometry args={[4.95, 0.6, 0.09]} />
+          <boxGeometry args={[4.1, 0.6, 0.09]} />
           <meshStandardMaterial color="#0a1520" roughness={0.1} metalness={0.5} emissive={c.glowColor} emissiveIntensity={0.3} />
         </mesh>
         {[-0.75, 0, 0.75].map((dx, j) => (
@@ -1924,63 +1924,63 @@ function ZoneCommand() {
             <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
           </mesh>
         ))}
-        <OfficeChair position={[0, 0, -3.15]} rotation={0} />
+        <OfficeChair position={[0, 0, -2.6]} rotation={0} />
       </group>
     ))}
 
     {/* 指挥席椅子 */}
-    {[-4.95, -1.7, 1.7, 4.95].map((x, i) => (
-      <OfficeChair key={i} position={[x, 0, 10.8]} rotation={Math.PI} />
+    {[-4.1, -1.4, 1.4, 4.1].map((x, i) => (
+      <OfficeChair key={i} position={[x, 0, 9]} rotation={Math.PI} />
     ))}
 
     {/* ===== 三块数据驱动大屏 ===== */}
     {/* 左屏 */}
-    <group position={[-15.75, 3.6, -8.55]} rotation={[0, Math.PI / 4.5, 0]}>
+    <group position={[-13.1, 3.6, -7.1]} rotation={[0, Math.PI / 4.5, 0]}>
       <mesh position={[0, 0, -0.15]}>
-        <boxGeometry args={[11.25, 8.1, 0.23]} />
+        <boxGeometry args={[9.4, 6.75, 0.23]} />
         <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
       </mesh>
-      <MiniTaskStatScreen width={10.8} height={7.5} color={c.glowColor} type="pending" />
+      <MiniTaskStatScreen width={9} height={6.25} color={c.glowColor} type="pending" />
       <mesh position={[0, 2.48, 0.07]}>
-        <boxGeometry args={[10.35, 0.41, 0.03]} />
+        <boxGeometry args={[8.6, 0.34, 0.03]} />
         <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.0} />
       </mesh>
       <pointLight position={[0, 0, 1]} intensity={0.6} color={c.glowColor} distance={8} />
     </group>
 
     {/* 中央主屏 */}
-    <group position={[0, 4.2, -13.5]}>
+    <group position={[0, 4.2, -11.3]}>
       <mesh position={[0, 0, -0.18]}>
-        <boxGeometry args={[21.45, 10.8, 0.27]} />
+        <boxGeometry args={[17.9, 9, 0.27]} />
         <meshStandardMaterial color="#0a1828" roughness={0.25} metalness={0.7} />
       </mesh>
-      <TaskCommandScreen width={20.7} height={10.2} color={c.glowColor} />
+      <TaskCommandScreen width={17} height={8} color={c.glowColor} />
       <mesh position={[0, 3.38, 0.07]}>
-        <boxGeometry args={[20.25, 0.49, 0.03]} />
+        <boxGeometry args={[16.9, 0.41, 0.03]} />
         <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.5} />
       </mesh>
       <pointLight position={[0, 0, 1]} intensity={1.0} color={c.glowColor} distance={12} />
     </group>
 
     {/* 右屏 */}
-    <group position={[15.75, 3.6, -8.55]} rotation={[0, -Math.PI / 4.5, 0]}>
+    <group position={[13.1, 3.6, -7.1]} rotation={[0, -Math.PI / 4.5, 0]}>
       <mesh position={[0, 0, -0.15]}>
-        <boxGeometry args={[11.25, 8.1, 0.23]} />
+        <boxGeometry args={[9.4, 6.75, 0.23]} />
         <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
       </mesh>
-      <MiniTaskStatScreen width={10.8} height={7.5} color={c.glowColor} type="done" />
+      <MiniTaskStatScreen width={9} height={6.25} color={c.glowColor} type="done" />
       <mesh position={[0, 2.48, 0.07]}>
-        <boxGeometry args={[10.35, 0.41, 0.03]} />
+        <boxGeometry args={[8.6, 0.34, 0.03]} />
         <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={2.0} />
       </mesh>
       <pointLight position={[0, 0, 1]} intensity={0.6} color={c.glowColor} distance={8} />
     </group>
 
     {/* 环境光照 */}
-    <pointLight position={[0, 4.5, -4.5]} intensity={2.5} color={c.glowColor} distance={30} />
-    <rectAreaLight position={[0, 6, -10.2]} rotation={[-Math.PI / 2, 0, 0]} width={27} height={8} intensity={2.0} color={c.glowColor} />
-    <pointLight position={[-13.5, 1.8, 0]} intensity={1.0} color={c.glowColor} distance={20} />
-    <pointLight position={[13.5, 1.8, 0]} intensity={1.0} color={c.glowColor} distance={20} />
+    <pointLight position={[0, 4.5, -4.5]} intensity={2.5} color={c.glowColor} distance={25} />
+    <rectAreaLight position={[0, 6, -8.5]} rotation={[-Math.PI / 2, 0, 0]} width={22.5} height={6.7} intensity={2.0} color={c.glowColor} />
+    <pointLight position={[-11.3, 1.8, 0]} intensity={1.0} color={c.glowColor} distance={16} />
+    <pointLight position={[11.3, 1.8, 0]} intensity={1.0} color={c.glowColor} distance={16} />
   </group>
   );
 }

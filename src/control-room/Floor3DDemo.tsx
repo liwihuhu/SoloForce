@@ -4,16 +4,20 @@
 // ===========================================
 
 import { useRef, useState, useMemo, useLayoutEffect, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ===========================================
-// 全局状态（模块级，跨组件共享）
+// 楼层工具函数（纯函数，无副作用）
 // ===========================================
-let globalFloorIndex = 3;
-let globalTargetY = -3; // 相机目标楼层Y
-function setGlobalFloor(v: number) { globalFloorIndex = v; globalTargetY = -v * FLOOR_HEIGHT; }
+function getFloorY(floorIndex: number) {
+  return -floorIndex * FLOOR_HEIGHT;
+}
+function getFloorIndex(floorId: string) {
+  return FLOORS.findIndex(f => f.id === floorId);
+}
 
 // 员工数据缓存（模块级）
 interface FloorEmployee {
@@ -983,7 +987,7 @@ function TaskCommandScreen({ width, height, color }: { width: number; height: nu
       ctx.fillStyle = `${color}44`;
       ctx.fillRect(listX + 8, listY + 36, listW - 16, 1);
 
-      teams.slice(0, 6).forEach((team: any, i) => {
+      teams.slice(0, 6).forEach((team: any, i: number) => {
         const rowY = listY + 50 + i * 36;
         const done = Math.floor(Math.random() * 20) + 5;
         const totalT = done + Math.floor(Math.random() * 5);
@@ -1610,9 +1614,11 @@ function TeamProgressRing({ centerX, centerY, progress, color, taskCount = 0 }: 
   const sphereRef = useRef<THREE.Mesh>(null!);
   const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 128; c.height = 128; return c; }, []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+  const elapsedRef = useRef(0);
 
   useLayoutEffect(() => {
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     ctx.clearRect(0, 0, 128, 128);
     ctx.fillStyle = '#000c1a';
     ctx.beginPath();
@@ -1629,9 +1635,11 @@ function TeamProgressRing({ centerX, centerY, progress, color, taskCount = 0 }: 
     texture.needsUpdate = true;
   }, [taskCount, color, canvas, texture]);
 
-  useFrame(({ clock }) => {
-    if (ringRef.current) ringRef.current.rotation.z = clock.elapsedTime * 0.3;
-    if (sphereRef.current) sphereRef.current.rotation.y = clock.elapsedTime * 0.5;
+  useFrame((_, delta) => {
+    elapsedRef.current += delta;
+    const t = elapsedRef.current;
+    if (ringRef.current) ringRef.current.rotation.z = t * 0.3;
+    if (sphereRef.current) sphereRef.current.rotation.y = t * 0.5;
   });
   return (
     <group position={[centerX, centerY, 0]}>
@@ -1678,12 +1686,12 @@ function AnimatedFlowLine({ start, end, color }: {
   }, [start, end]);
 
   const dashRef = useRef<THREE.Mesh>(null!);
-  useFrame(({ clock }) => {
-    if (dashRef.current) {
-      const t = (clock.elapsedTime * 0.4) % 1;
-      const idx = Math.floor(t * points.length);
-      dashRef.current.position.copy(points[idx] || points[0]);
-    }
+  const elapsedRef = useRef(0);
+  useFrame((_, delta) => {
+    elapsedRef.current += delta;
+    const t = (elapsedRef.current * 0.4) % 1;
+    const idx = Math.floor(t * points.length);
+    if (dashRef.current) dashRef.current.position.copy(points[idx] || points[0]);
   });
 
   return (
@@ -2022,10 +2030,8 @@ function NeuralNodeCard({ width, height, color, data, sc, isMe, label }: {
 // ===========================================
 // 单个楼层3D场景
 // ===========================================
-function Floor3DScene({ floorId }: { floorId: string }) {
+function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: number }) {
   const config = FLOORS.find(f => f.id === floorId) || FLOORS[0];
-  const floorIndex = FLOORS.findIndex(f => f.id === floorId);
-  setGlobalFloor(floorIndex);
 
 
   if (floorId === '1f') {
@@ -2037,7 +2043,10 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <meshStandardMaterial color={config.floorColor} roughness={0.25} metalness={0.4} emissive={config.glowColor} emissiveIntensity={0.04} />
         </mesh>
         {/* 大厅网格 */}
-        <gridHelper args={[16, 24, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.12} transparent />
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[16, 12]} />
+          <meshStandardMaterial color={config.glowColor} transparent opacity={0.12} depthWrite={false} />
+        </mesh>
 
         {/* ===== 中央巨型 SoloForce 品牌大屏 ===== */}
         <group position={[0, 3.2, -5.0]}>
@@ -2250,7 +2259,10 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <planeGeometry args={[16, 12]} />
           <meshStandardMaterial color={config.floorColor} roughness={0.25} metalness={0.4} emissive={config.glowColor} emissiveIntensity={0.04} />
         </mesh>
-        <gridHelper args={[16, 24, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.12} transparent />
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[16, 12]} />
+          <meshStandardMaterial color={config.glowColor} transparent opacity={0.12} depthWrite={false} />
+        </mesh>
 
         {/* ===== 背景墙员工总览大屏 ===== */}
         <group position={[0, 3.2, -5.7]}>
@@ -2348,9 +2360,11 @@ function Floor3DScene({ floorId }: { floorId: string }) {
 
     // Neural core ref (for breathing + slow rotation)
     const neuralRef = useRef<THREE.Group>(null!);
-    useFrame(({ clock }) => {
+    const neuralElapsedRef = useRef(0);
+    useFrame((_, delta) => {
       if (!neuralRef.current) return;
-      const t = clock.getElapsedTime();
+      neuralElapsedRef.current += delta;
+      const t = neuralElapsedRef.current;
       // Slow Y-axis rotation of entire neural core
       neuralRef.current.rotation.y = t * 0.18;
       // Inner sphere breathing
@@ -2364,8 +2378,10 @@ function Floor3DScene({ floorId }: { floorId: string }) {
 
     // Terminal node refs for floating animation
     const nodeRefs = useRef<(THREE.Group | null)[]>([]);
-    useFrame(({ clock }) => {
-      const t = clock.getElapsedTime();
+    const nodeElapsedRef = useRef(0);
+    useFrame((_, delta) => {
+      nodeElapsedRef.current += delta;
+      const t = nodeElapsedRef.current;
       nodeRefs.current.forEach((ref, i) => {
         if (!ref) return;
         const offset = i * (Math.PI * 2 / 8);
@@ -2374,7 +2390,7 @@ function Floor3DScene({ floorId }: { floorId: string }) {
       });
     });
 
-    const neuralNodes = [
+    const neuralNodes: Array<{ angle: number; color: string; label: string; key: 'ME' | 'AGENTS' | 'GATEWAY' | 'TASKS' | 'MEMORY' | 'SESSIONS' | 'SKILLS' | 'MCP'; isMe: boolean }> = [
       { angle: 0,          color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
       { angle: Math.PI / 4,       color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
       { angle: Math.PI / 2,       color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
@@ -2403,7 +2419,10 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           />
         </mesh>
         {/* Organic hex grid overlay */}
-        <gridHelper args={[20, 40, '#0d2040', '#0d2040']} position={[0, 0.005, 0]} opacity={0.35} transparent />
+        <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[20, 12]} />
+          <meshStandardMaterial color="#0d2040" transparent opacity={0.35} depthWrite={false} />
+        </mesh>
 
         {/* Subtle concentric glow rings on floor */}
         {[2.5, 5.0, 7.5].map((r, i) => (
@@ -2585,7 +2604,10 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <planeGeometry args={[12, 8]} />
           <meshStandardMaterial color={config.floorColor} roughness={0.4} metalness={0.3} emissive={config.glowColor} emissiveIntensity={0.08} />
         </mesh>
-        <gridHelper args={[12, 20, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.3} transparent />
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[12, 8]} />
+          <meshStandardMaterial color={config.glowColor} transparent opacity={0.3} depthWrite={false} />
+        </mesh>
 
         {/* ===== 主控台（面向屏幕的操控席） ===== */}
         {/* 中央操控台 */}
@@ -2740,7 +2762,10 @@ function Floor3DScene({ floorId }: { floorId: string }) {
           <planeGeometry args={[16, 12]} />
           <meshStandardMaterial color={config.floorColor} roughness={0.25} metalness={0.4} emissive={config.glowColor} emissiveIntensity={0.04} />
         </mesh>
-        <gridHelper args={[16, 24, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.12} transparent />
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[16, 12]} />
+          <meshStandardMaterial color={config.glowColor} transparent opacity={0.12} depthWrite={false} />
+        </mesh>
 
         {/* ===== 背景墙多团队总览大屏 ===== */}
         <group position={[0, 3.2, -5.7]}>
@@ -3011,7 +3036,10 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
           <planeGeometry args={[20, 12]} />
           <meshStandardMaterial color={config.floorColor} roughness={0.25} metalness={0.4} emissive={config.glowColor} emissiveIntensity={0.05} />
         </mesh>
-        <gridHelper args={[20, 30, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.1} transparent />
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[20, 12]} />
+          <meshStandardMaterial color={config.glowColor} transparent opacity={0.1} depthWrite={false} />
+        </mesh>
 
         {/* ===== BACK WALL - Full-width history timeline ===== */}
         <group position={[0, 2.8, -5.5]}>
@@ -3253,7 +3281,10 @@ function TaskHistoryStatScreen({ width, height, color, side }: { width: number; 
         <planeGeometry args={[12, 8]} />
         <meshStandardMaterial color={config.floorColor} roughness={0.6} metalness={0.2} emissive={config.glowColor} emissiveIntensity={0.06} />
       </mesh>
-      <gridHelper args={[12, 20, config.glowColor, config.glowColor]} position={[0, 0.01, 0]} opacity={0.3} transparent />
+      <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[12, 8]} />
+        <meshStandardMaterial color={config.glowColor} transparent opacity={0.3} depthWrite={false} />
+      </mesh>
       {[-2.5, 0, 2.5].map((z, zi) =>
         [-3.5, -1.5, 0.5, 2.5].map((x, xi) => (
           <group key={`${zi}-${xi}`}>
@@ -3320,22 +3351,20 @@ function AllFloorsStack({ currentFloor }: { currentFloor: string }) {
 }
 
 // ===========================================
-// 相机控制器
+// 相机控制器 — useEffect 驱动，无全局状态
 // ===========================================
-function CameraController({ orbitRef }: { orbitRef: React.RefObject<any> }) {
+function CameraController({ orbitRef, floorY }: { orbitRef: React.RefObject<any>; floorY: number }) {
   const { camera } = useThree();
-  const prevFloorRef = useRef(-3);
 
-  useFrame(() => {
-    const targetFloorY = globalTargetY;
-    // 只在楼层变化时更新 OrbitControls 目标
-    if (orbitRef.current && prevFloorRef.current !== targetFloorY) {
-      const currentTarget = orbitRef.current.target as THREE.Vector3;
-      currentTarget.y = targetFloorY;
-      orbitRef.current.update();
-      prevFloorRef.current = targetFloorY;
+  // 楼层切换时：直接设置 OrbitControls 目标（不用 useFrame）
+  useEffect(() => {
+    if (!orbitRef.current) return;
+    const ctrl = orbitRef.current as any;
+    if (ctrl.target) {
+      ctrl.target.set(ctrl.target.x, floorY, ctrl.target.z);
+      ctrl.update();
     }
-  });
+  }, [floorY, orbitRef]);
 
   return null;
 }
@@ -3344,10 +3373,21 @@ function CameraController({ orbitRef }: { orbitRef: React.RefObject<any> }) {
 // 主组件
 // ===========================================
 export default function Floor3DDemo() {
+  const navigate = useNavigate();
   const [currentFloor, setCurrentFloor] = useState('4f');
+  // 每次楼层变化时递增，用于触发表级 CSS 过渡动画
+  const [transitionKey, setTransitionKey] = useState(0);
   const currentConfig = FLOORS.find(f => f.id === currentFloor) || FLOORS[0];
+  const floorIndex = getFloorIndex(currentFloor);
+  const floorY = getFloorY(floorIndex);
 
   const orbitRef = useRef(null);
+
+  // 楼层切换：触发表级过渡动画
+  const handleFloorChange = useCallback((floorId: string) => {
+    setCurrentFloor(floorId);
+    setTransitionKey(k => k + 1);
+  }, []);
 
   // 监听员工选中事件，跳转到员工详情
   useEffect(() => {
@@ -3411,7 +3451,7 @@ export default function Floor3DDemo() {
           return (
             <button
               key={floor.id}
-              onClick={() => setCurrentFloor(floor.id)}
+              onClick={() => handleFloorChange(floor.id)}
               style={{
                 background: isActive ? `${floor.color}20` : 'transparent',
                 border: `1px solid ${isActive ? floor.color : 'transparent'}`,
@@ -3464,7 +3504,24 @@ export default function Floor3DDemo() {
           🖱️ 右键拖动 - 平移<br />
           🖱️ 滚轮 - 缩放
         </div>
-
+        <button
+          onClick={() => navigate('/flat')}
+          style={{
+            marginTop: '10px',
+            width: '100%',
+            background: 'rgba(244,114,182,0.15)',
+            border: '1px solid #F472B6',
+            borderRadius: '8px',
+            padding: '7px 12px',
+            color: '#F472B6',
+            fontSize: '11px',
+            cursor: 'pointer',
+            fontFamily: "'SF Mono', 'Fira Code', monospace",
+            letterSpacing: '1px',
+          }}
+        >
+          🗺️ 平铺总览视图
+        </button>
       </div>
 
       {/* 底部状态栏 */}
@@ -3489,10 +3546,18 @@ export default function Floor3DDemo() {
         </span>
       </div>
 
-      {/* Three.js Canvas */}
+      {/* Three.js Canvas — 表级过渡动画包裹层 */}
+      <div
+        key={`canvas-wrap-${transitionKey}`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          animation: 'floorFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+        }}
+      >
       <Canvas shadows style={{ position: 'absolute', inset: 0 }}>
         <PerspectiveCamera makeDefault position={[8, 6, 8]} fov={50} />
-        <CameraController orbitRef={orbitRef} />
+        <CameraController orbitRef={orbitRef} floorY={floorY} />
         <OrbitControls
           ref={orbitRef}
           enablePan
@@ -3502,7 +3567,7 @@ export default function Floor3DDemo() {
           maxPolarAngle={Math.PI / 2.1}
           minDistance={5}
           maxDistance={25}
-          target={[0, -globalFloorIndex * FLOOR_HEIGHT, 0]}
+          target={[0, floorY, 0]}
         />
         <ambientLight intensity={0.5} />
         <directionalLight
@@ -3518,10 +3583,18 @@ export default function Floor3DDemo() {
           shadow-camera-bottom={-10}
         />
         <pointLight position={[-5, 5, -5]} intensity={0.8} color="#4a6a9a" />
-        <Floor3DScene floorId={currentFloor} />
+        <Floor3DScene floorId={currentFloor} floorIndex={floorIndex} />
         <AllFloorsStack currentFloor={currentFloor} />
         <fog attach="fog" args={['#0a0a14', 20, 50]} />
       </Canvas>
+      </div>
+
+      <style>{`
+        @keyframes floorFadeIn {
+          from { opacity: 0; transform: scale(0.97); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 }

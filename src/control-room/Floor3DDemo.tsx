@@ -2418,25 +2418,30 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
           <pointLight intensity={5.0} color={config.glowColor} distance={14} />
 
           {/* 核心顶背对背双屏 — 两屏背对背立于核心上方 */}
-          {/* 核心顶单屏 — 正反两面显示内容 */}
+          {/* 核心顶单屏 — 正反两面分别渲染，无DoubleSide阴影问题 */}
           <group position={[0, 1.6, 0]} rotation={[0, Math.PI / 4, 0]}>
-            <mesh position={[0, 0, 0]}>
-              <boxGeometry args={[1.5, 0.9, 0.04]} />
-              <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.1} side={THREE.DoubleSide} />
+            {/* 背面（先渲染） */}
+            <mesh position={[0, 0, -0.022]}>
+              <planeGeometry args={[1.5, 0.9]} />
+              <meshStandardMaterial color="#010810" roughness={0.1} metalness={0.6} emissive={config.glowColor} emissiveIntensity={0.05} side={THREE.FrontSide} />
             </mesh>
-            {/* 边框发光 */}
-            <mesh position={[0, 0, 0.025]}>
-              <boxGeometry args={[1.55, 0.94, 0.01]} />
-              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} transparent opacity={0.6} side={THREE.DoubleSide} />
+            <mesh position={[0, 0, -0.021]}>
+              <planeGeometry args={[1.55, 0.94]} />
+              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.6} transparent opacity={0.6} side={THREE.FrontSide} />
             </mesh>
-            {/* 正面的内容 (z=0.036) */}
-            <Text position={[0, 0.08, 0.036]} fontSize={0.18} color={config.glowColor} anchorX="center" anchorY="middle">OPENCLAW</Text>
-            <Text position={[0, -0.16, 0.036]} fontSize={0.11} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>NEURAL ENGINE v2.0</Text>
-            {/* 反面的内容 (z=-0.036, 旋转180°) */}
-            <group rotation={[0, Math.PI, 0]}>
-              <Text position={[0, 0.08, 0.036]} fontSize={0.18} color={config.glowColor} anchorX="center" anchorY="middle">AGENTS: 8</Text>
-              <Text position={[0, -0.16, 0.036]} fontSize={0.11} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>SESSIONS: 3</Text>
-            </group>
+            <Text position={[0, 0.08, -0.02]} fontSize={0.18} color={config.glowColor} anchorX="center" anchorY="middle" rotation={[0, Math.PI, 0]}>AGENTS: 8</Text>
+            <Text position={[0, -0.16, -0.02]} fontSize={0.11} color={config.glowColor} anchorX="center" anchorY="middle" rotation={[0, Math.PI, 0]} fillOpacity={0.7}>SESSIONS: 3</Text>
+            {/* 正面（后渲染，z值更大，叠在上面） */}
+            <mesh position={[0, 0, 0.022]}>
+              <planeGeometry args={[1.5, 0.9]} />
+              <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.1} side={THREE.FrontSide} />
+            </mesh>
+            <mesh position={[0, 0, 0.023]}>
+              <planeGeometry args={[1.55, 0.94]} />
+              <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={0.8} transparent opacity={0.8} side={THREE.FrontSide} />
+            </mesh>
+            <Text position={[0, 0.08, 0.024]} fontSize={0.18} color={config.glowColor} anchorX="center" anchorY="middle">OPENCLAW</Text>
+            <Text position={[0, -0.16, 0.024]} fontSize={0.11} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>NEURAL ENGINE v2.0</Text>
           </group>
 
         </group>

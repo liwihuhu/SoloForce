@@ -447,6 +447,311 @@ const EMP_TYPE_COLORS: Record<string, string> = {
 
 
 
+interface FloorEmployee {
+  id: string;
+  name: string;
+  type: string;
+  status: 'idle' | 'busy' | 'offline';
+  department?: string;
+  roleName?: string;
+  tasksCompleted?: number;
+  efficiency?: number;
+}
+const floorEmployeesCache: { data: FloorEmployee[]; ts: number } = { data: [], ts: 0 };
+
+// 派发员工选中事件（供外部监听跳转）
+
+
+function dispatchEmployeeSelect(employeeId: string) {
+  window.dispatchEvent(new CustomEvent('floor-employee-select', { detail: { employeeId } }));
+}
+
+
+function EmployeeOverviewScreen({ position, color }: { position: [number, number, number]; color: string }) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 1024; c.height = 512; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+  const [empData, setEmpData] = useState<FloorEmployee[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [empRes, statRes] = await Promise.all([
+        fetch('http://localhost:5301/api/employees').then(r => r.json()).catch(() => ({ success: false })),
+        fetch('http://localhost:5301/api/task-history/statistics').then(r => r.json()).catch(() => ({ success: false })),
+      ]);
+      if (!empRes.success) return;
+      const employees: FloorEmployee[] = empRes.data.items.map((e: any) => ({
+        id: e.id, name: e.name, type: e.type,
+        status: e.status || 'idle', department: e.department || '',
+        roleName: e.roleName || e.type, tasksCompleted: 0, efficiency: Math.random() * 0.4 + 0.6,
+      }));
+      if (statRes.success) {
+        const empStats = statRes.data.employeeStats || {};
+        employees.forEach(e => {
+          if (empStats[e.id]) {
+            e.tasksCompleted = empStats[e.id].tasksCompleted || 0;
+            e.efficiency = empStats[e.id].efficiency || 0.8;
+          }
+        });
+      }
+      setEmpData(employees);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => { fetchData(); const iv = setInterval(fetchData, 5000); return () => clearInterval(iv); }, [fetchData]);
+
+  useLayoutEffect(() => {
+    const ctx = canvas.getContext('2d')!;
+    const W = 1024, H = 512;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#000c1a';
+    ctx.fillRect(0, 0, W, H);
+
+    // 顶部标题条
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, W, 48);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 24px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('DIGITAL WORKFORCE · 数字员工总览', W / 2, 24);
+
+    // ===== 四格统计卡片 =====
+    const totalEmp = empData.length || 12;
+    const onlineEmp = empData.filter(e => e.status !== 'offline').length;
+    const busyEmp = empData.filter(e => e.status === 'busy').length;
+    const totalTasks = empData.reduce((s, e) => s + (e.tasksCompleted || 0), 0);
+    const cards = [
+      { label: 'DIGITAL WORKERS', value: totalEmp, color: '#3B82F6' },
+      { label: 'ONLINE', value: onlineEmp, color: '#22C55E' },
+      { label: 'BUSY', value: busyEmp, color: '#F59E0B' },
+      { label: 'TOTAL TASKS', value: totalTasks, color: '#F472B6' },
+    ];
+    cards.forEach((card, i) => {
+      const cx = 40 + i * 242;
+      ctx.fillStyle = `${card.color}15`;
+      ctx.strokeStyle = card.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cx, 68, 222, 110, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = card.color;
+      ctx.fillRect(cx + 10, 68, 36, 3);
+      ctx.fillStyle = `${card.color}cc`;
+      ctx.font = '15px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(card.label, cx + 14, 98);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 44px "SF Mono", monospace';
+      ctx.fillText(String(card.value), cx + 14, 155);
+    });
+
+    // ===== 员工列表 =====
+    const listY = 200;
+    ctx.fillStyle = `${color}88`;
+    ctx.font = '14px "SF Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('WORKFORCE ROSTER', 40, listY - 10);
+
+    // 表头
+    const cols = [
+      { x: 40, label: 'NAME', w: 160 },
+      { x: 210, label: 'ROLE', w: 160 },
+      { x: 380, label: 'DEPT', w: 160 },
+      { x: 550, label: 'STATUS', w: 100 },
+      { x: 660, label: 'TASKS', w: 80 },
+      { x: 750, label: 'EFFI', w: 80 },
+    ];
+    ctx.fillStyle = `${color}44`;
+    ctx.beginPath();
+    ctx.roundRect(36, listY, 820, 28, 6);
+    ctx.fill();
+    cols.forEach(col => {
+      ctx.fillStyle = `${color}bb`;
+      ctx.font = 'bold 12px "SF Mono", monospace';
+      ctx.fillText(col.label, col.x + 8, listY + 19);
+    });
+
+    // 员工行
+    const rowH = 28;
+    empData.slice(0, 9).forEach((emp, i) => {
+      const ry = listY + 28 + i * rowH;
+      const rowBg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)';
+      ctx.fillStyle = rowBg;
+      ctx.beginPath();
+      ctx.roundRect(36, ry, 820, rowH - 2, 4);
+      ctx.fill();
+      const ec = EMP_TYPE_COLORS[emp.type] || color;
+      const statusColor = emp.status === 'busy' ? '#F59E0B' : emp.status === 'offline' ? '#6B7280' : '#22C55E';
+      ctx.fillStyle = '#fff';
+      ctx.font = '13px "SF Mono", monospace';
+      ctx.fillText(emp.name, 46, ry + 18);
+      ctx.fillStyle = `${ec}cc`;
+      ctx.fillText(emp.roleName || emp.type, 216, ry + 18);
+      ctx.fillStyle = '#94A3B8';
+      ctx.fillText(emp.department || '-', 386, ry + 18);
+      // 状态点
+      ctx.beginPath();
+      ctx.arc(596, ry + 14, 5, 0, Math.PI * 2);
+      ctx.fillStyle = statusColor;
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px "SF Mono", monospace';
+      ctx.fillText(emp.status === 'idle' ? '在线' : emp.status === 'busy' ? '忙碌' : '离线', 606, ry + 18);
+      ctx.fillText(String(emp.tasksCompleted || 0), 666, ry + 18);
+      ctx.fillStyle = `${ec}aa`;
+      ctx.fillText(`${Math.round((emp.efficiency || 0) * 100)}%`, 756, ry + 18);
+    });
+
+    // 底部状态条
+    ctx.fillStyle = '#22C55E';
+    ctx.fillRect(0, H - 36, W, 36);
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    ctx.fillStyle = '#000';
+    ctx.font = '15px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`LIVE · ${timeStr} · 数字员工人事墙 · 每5秒刷新`, W / 2, H - 14);
+
+    texture.needsUpdate = true;
+  }, [empData, color, canvas, texture]);
+
+  // 每秒更新时间
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const ctx = canvas.getContext('2d')!;
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+      ctx.fillStyle = '#22C55E';
+      ctx.fillRect(0, 512 - 36, 1024, 36);
+      ctx.fillStyle = '#000';
+      ctx.font = '15px "SF Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`LIVE · ${timeStr} · 数字员工人事墙 · 每5秒刷新`, 512, 512 - 14);
+      texture.needsUpdate = true;
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [canvas, texture]);
+
+  return (
+    <mesh ref={meshRef}>
+      <planeGeometry args={[12, 6]} />
+      <meshBasicMaterial map={texture} />
+    </mesh>
+  );
+}
+
+
+function EmployeeStation({
+  position, employee, stationColor, onClick
+}: {
+  position: [number, number, number];
+  employee: FloorEmployee;
+  stationColor: string;
+  onClick: (id: string) => void;
+}) {
+  const meshRef = useRef<THREE.Group>(null!);
+  const screenRef = useRef<THREE.Mesh>(null!);
+  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 256; c.height = 256; return c; }, []);
+  const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
+
+  const statusColor = employee.status === 'busy' ? '#F59E0B' : employee.status === 'offline' ? '#6B7280' : '#22C55E';
+
+  useLayoutEffect(() => {
+    const ctx = canvas.getContext('2d')!;
+    const W = 256, H = 256;
+    ctx.clearRect(0, 0, W, H);
+    // 背景
+    ctx.fillStyle = '#000c1a';
+    ctx.fillRect(0, 0, W, H);
+    // 顶部色条
+    ctx.fillStyle = stationColor;
+    ctx.fillRect(0, 0, W, 32);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 13px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(employee.roleName || employee.type, W / 2, 21);
+    // 头像占位圆
+    ctx.beginPath();
+    ctx.arc(W / 2, 90, 38, 0, Math.PI * 2);
+    ctx.fillStyle = `${stationColor}33`;
+    ctx.fill();
+    ctx.strokeStyle = stationColor;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = stationColor;
+    ctx.font = 'bold 36px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(employee.name.slice(0, 1), W / 2, 90);
+    // 姓名
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 22px "SF Mono", monospace';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(employee.name, W / 2, 148);
+    // 部门
+    ctx.fillStyle = `${stationColor}cc`;
+    ctx.font = '13px "SF Mono", monospace';
+    ctx.fillText(employee.department || '', W / 2, 172);
+    // 分隔线
+    ctx.fillStyle = `${stationColor}44`;
+    ctx.fillRect(20, 188, W - 40, 1);
+    // 完成任务数
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px "SF Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('TASKS', 20, 210);
+    ctx.textAlign = 'right';
+    ctx.fillText(String(employee.tasksCompleted || 0), W - 20, 210);
+    // 效率
+    ctx.fillStyle = `${stationColor}88`;
+    ctx.textAlign = 'left';
+    ctx.fillText('EFFI', 20, 230);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${Math.round((employee.efficiency || 0) * 100)}%`, W - 20, 230);
+    texture.needsUpdate = true;
+  }, [employee, stationColor, canvas, texture]);
+
+  return (
+    <group ref={meshRef} position={position} onClick={() => onClick(employee.id)}>
+      {/* 工位桌面 */}
+      <mesh position={[0, 0.75, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.4, 0.06, 0.7]} />
+        <meshStandardMaterial color="#1e3a5f" roughness={0.3} metalness={0.1} />
+      </mesh>
+      {/* 桌腿 */}
+      {[[-0.6, 0], [0.6, 0], [-0.6, -0.25], [0.6, -0.25]].map(([x, z], i) => (
+        <mesh key={i} position={[x, 0.36, z]} castShadow>
+          <boxGeometry args={[0.05, 0.72, 0.05]} />
+          <meshStandardMaterial color="#2a2a3a" roughness={0.5} metalness={0.3} />
+        </mesh>
+      ))}
+      {/* 屏幕背景框 */}
+      <mesh position={[0, 1.35, 0.12]}>
+        <boxGeometry args={[0.9, 0.75, 0.03]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+      </mesh>
+      {/* 屏幕面板 */}
+      <mesh ref={screenRef} position={[0, 1.35, 0.14]}>
+        <planeGeometry args={[0.85, 0.7]} />
+        <meshBasicMaterial map={texture} />
+      </mesh>
+      {/* 状态指示灯 */}
+      <mesh position={[0.55, 1.3, 0.14]}>
+        <sphereGeometry args={[0.05, 8, 8]} />
+        <meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={2.0} />
+      </mesh>
+      {/* 底座装饰 */}
+      <mesh position={[0, 0.02, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1.5, 0.8]} />
+        <meshStandardMaterial color={stationColor} emissive={stationColor} emissiveIntensity={0.05} transparent opacity={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+
 function ZoneLobby() {
   const c = FLOORS[0];
   return (
@@ -636,7 +941,114 @@ function ZoneLobby() {
   </group>
   );
 }
-function ZoneHR()      { const f = FLOORS[1]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
+function ZoneHR() {
+  const c = FLOORS[1];
+  // 本地状态存储员工数据（楼层切换时重新请求）
+      const [empData, setEmpData] = useState<FloorEmployee[]>([]);
+
+      useEffect(() => {
+          let cancelled = false;
+        (async () => {
+          try {
+            const [empRes, statRes] = await Promise.all([
+              fetch('http://localhost:5301/api/employees').then(r => r.json()).catch(() => ({ success: false })),
+              fetch('http://localhost:5301/api/task-history/statistics').then(r => r.json()).catch(() => ({ success: false })),
+            ]);
+            if (cancelled) return;
+            const employees: FloorEmployee[] = empRes.success
+              ? empRes.data.items.map((e: any) => ({
+                  id: e.id, name: e.name, type: e.type,
+                  status: e.status || 'idle',
+                  department: e.department || '',
+                  roleName: e.roleName || e.type,
+                  tasksCompleted: 0, efficiency: Math.random() * 0.4 + 0.6,
+                }))
+              : [];
+            if (statRes.success) {
+              const empStats = statRes.data.employeeStats || {};
+              employees.forEach(e => {
+                if (empStats[e.id]) {
+                  e.tasksCompleted = empStats[e.id].tasksCompleted || 0;
+                  e.efficiency = empStats[e.id].efficiency || Math.random() * 0.4 + 0.6;
+                }
+              });
+            }
+            setEmpData(employees);
+          } catch (_) {}
+        })();
+        return () => { cancelled = true; };
+      }, []);
+
+      // 12个员工按顺序排列（4×3网格），位置与部门对应
+      const rowColors = ['#3B82F6', '#4ADE80', '#FBBF24'];
+      const rowLabels = ['技术研发部', '运营分析部', '管理支持部'];
+      const stationPositions: [number, number, number][] = [
+        // 第1排（技术）
+        [-4.2, 0, -1.5], [-1.4, 0, -1.5], [1.4, 0, -1.5], [4.2, 0, -1.5],
+        // 第2排（运营）
+        [-4.2, 0, 0.5],   [-1.4, 0, 0.5],   [1.4, 0, 0.5],   [4.2, 0, 0.5],
+        // 第3排（管理）
+        [-4.2, 0, 2.5],   [-1.4, 0, 2.5],   [1.4, 0, 2.5],   [4.2, 0, 2.5],
+      ];
+  return (
+  <group position={[0, 0, 0]}>
+    {/* 地板 */}
+    <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 12]} />
+      <meshStandardMaterial color={c.floorColor} roughness={0.25} metalness={0.4} emissive={c.glowColor} emissiveIntensity={0.04} />
+    </mesh>
+    <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 12]} />
+      <meshStandardMaterial color={c.glowColor} transparent opacity={0.12} depthWrite={false} />
+    </mesh>
+
+    {/* ===== 背景墙员工总览大屏 ===== */}
+    <group position={[0, 3.2, -5.7]}>
+      {/* 屏幕框架 */}
+      <mesh position={[0, 0, -0.08]}>
+        <boxGeometry args={[12.4, 6.4, 0.12]} />
+        <meshStandardMaterial color="#0a1828" roughness={0.3} metalness={0.7} />
+      </mesh>
+      {/* 主屏幕 */}
+      <EmployeeOverviewScreen position={[0, 0, 0]} color={c.glowColor} />
+      {/* 顶部装饰条 */}
+      <mesh position={[0, 3.2, 0.01]}>
+        <boxGeometry args={[12.0, 0.35, 0.02]} />
+        <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.5} />
+      </mesh>
+      {/* 左右补光 */}
+      <pointLight position={[-7, 0, 1]} intensity={0.5} color={c.glowColor} distance={6} />
+      <pointLight position={[7, 0, 1]} intensity={0.5} color={c.glowColor} distance={6} />
+    </group>
+
+    {/* 三排部门分区地面标签 */}
+    {[-1.5, 0.5, 2.5].map((z, ri) => (
+      <mesh key={ri} position={[0, 0.005, z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[14, 1.4]} />
+        <meshStandardMaterial color={rowColors[ri]} emissive={rowColors[ri]} emissiveIntensity={0.04} transparent opacity={0.25} />
+      </mesh>
+    ))}
+
+    {/* 12个员工工位 */}
+    {empData.slice(0, 12).map((emp, i) => (
+      <EmployeeStation
+        key={emp.id}
+        position={stationPositions[i]}
+        employee={emp}
+        stationColor={EMP_TYPE_COLORS[emp.type] || c.glowColor}
+        onClick={dispatchEmployeeSelect}
+      />
+    ))}
+
+    {/* 环境光 */}
+    <pointLight position={[0, 5, 0]} intensity={1.5} color={c.glowColor} distance={18} />
+    <rectAreaLight position={[0, 5, 0]} rotation={[-Math.PI / 2, 0, 0]} width={16} height={12} intensity={0.8} color={c.glowColor} />
+    <pointLight position={[0, 4.5, 4.5]} intensity={0.4} color={c.glowColor} distance={8} />
+    <pointLight position={[-6, 2, -1]} intensity={0.3} color={c.glowColor} distance={8} />
+    <pointLight position={[6, 2, -1]} intensity={0.3} color={c.glowColor} distance={8} />
+  </group>
+  );
+}
 function ZoneProject() { const f = FLOORS[2]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 function ZoneCommand()  { const f = FLOORS[3]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }
 function ZoneArchive() { const f = FLOORS[4]; return <FloorPlane color={f.color} emissive={f.glowColor} label={f.label} />; }

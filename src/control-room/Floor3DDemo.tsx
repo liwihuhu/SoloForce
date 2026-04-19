@@ -2256,8 +2256,33 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
       let cancelled = false;
       const fetchStatus = async () => {
         try {
-          const res = await fetch('http://localhost:5301/api/openclaw-status').then(r => r.json()).catch(() => null);
-          if (!cancelled && res?.success) setOcStatus(res.data);
+          const res = await fetch('http://localhost:18789/v1/responses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer a9b2a391cf24f37e397718bfdae0ff2302a1133f0fe2b3f2',
+            },
+            body: JSON.stringify({
+              model: 'openclaw',
+              input: '返回JSON格式的OpenClaw系统状态，不要任何其他文字，只返回纯JSON：{agents_count,sessions_active,tasks_active,memory_files,mcp_tools_count,skills_count,gateway_latency_ms,uptime_seconds}。如果无法获取则返回null。',
+            }),
+          }).then(r => r.json()).catch(() => null);
+          if (!cancelled && res?.output?.[0]?.content?.[0]?.text) {
+            const text = res.output[0].content[0].text;
+            try {
+              const json = JSON.parse(text.replace(/^[^{]*/,'').replace(/[^}]*$/,''));
+              setOcStatus({
+                agents: { count: json.agents_count ?? 1, sessions: json.sessions_active ?? 1 },
+                sessions: { active: json.sessions_active ?? 1 },
+                tasks: { active: json.tasks_active ?? 0, running: 0, tracked: 0 },
+                memory: { files: json.memory_files ?? 0, chunks: 0 },
+                gateway: { latency: json.gateway_latency_ms ?? 0, reachable: true },
+                skills: { count: json.skills_count ?? 0 },
+                mcp: { count: json.mcp_tools_count ?? 0 },
+                uptime: json.uptime_seconds ?? 0,
+              });
+            } catch (_) {}
+          }
         } catch (_) {}
       };
       fetchStatus();

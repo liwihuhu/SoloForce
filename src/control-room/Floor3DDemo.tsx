@@ -2456,8 +2456,8 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
               {/* Node point light */}
               <pointLight intensity={1.2} color={sc} distance={5} />
 
-              {/* 前方信息屏 — 屏幕向核心倾斜30° */}
-              <group position={[0, 0.2, -0.7]} rotation={[-Math.PI / 6, Math.PI, 0]}>
+              {/* 前方信息屏 — 屏幕向外斜靠核心30° */}
+              <group position={[0, 0.2, -0.7]} rotation={[-Math.PI / 6, -angle, 0]}>
                 {/* 屏幕背景 */}
                 <mesh position={[0, 0, 0]}>
                   <planeGeometry args={[1.0, 0.65]} />

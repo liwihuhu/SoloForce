@@ -2680,7 +2680,7 @@ function Scene() {
 // ─────────────────────────────────────────────────────────────────
 function UIOverlay({ onBack }: { onBack: () => void }) {
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', fontFamily: "'Space Mono', monospace" }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', fontFamily: "'Space Mono', monospace", zIndex: 10 }}>
       <div style={{ position: 'absolute', top: 16, left: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
         <button
           onClick={onBack}
@@ -2715,7 +2715,7 @@ export default function FloorFlatDemo() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#030810' }}>
+    <div style={{ width: '100vw', height: '100vh', background: '#030810', position: 'relative', zIndex: 0 }}>
       <Canvas
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl }) => { gl.setClearColor('#030810'); }}

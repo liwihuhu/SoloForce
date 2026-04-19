@@ -2554,6 +2554,75 @@ function ZoneCore() {
 // ─────────────────────────────────────────────────────────────────
 // Scene
 // ─────────────────────────────────────────────────────────────────
+
+// ── 走廊连接各区域 ─────────────────────────────────────────────────────────
+function Corridors() {
+  const H = 3;
+  const W = 4;
+  const alpha = 0.2;
+
+  return (
+    <group>
+      {/* 1F → 4F 走廊 (垂直, x=0, z: 13→19, 1F在前) */}
+      <mesh position={[0, 0.02, 16]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[W, 6]} />
+        <meshStandardMaterial color="#38BDF8" transparent opacity={0.15} emissive="#38BDF8" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[-W/2, H/2, 16]}><boxGeometry args={[0.1, H, 6]} /><meshStandardMaterial color="#38BDF8" transparent opacity={alpha} emissive="#38BDF8" emissiveIntensity={0.4} /></mesh>
+      <mesh position={[W/2, H/2, 16]}><boxGeometry args={[0.1, H, 6]} /><meshStandardMaterial color="#38BDF8" transparent opacity={alpha} emissive="#38BDF8" emissiveIntensity={0.4} /></mesh>
+
+      {/* 4F → 6F 走廊 (垂直, x=0, z: -13→-20, 4F在前) */}
+      <mesh position={[0, 0.02, -16.5]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[W, 7]} />
+        <meshStandardMaterial color="#FBBF24" transparent opacity={0.15} emissive="#FBBF24" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[-W/2, H/2, -16.5]}><boxGeometry args={[0.1, H, 7]} /><meshStandardMaterial color="#FBBF24" transparent opacity={alpha} emissive="#FBBF24" emissiveIntensity={0.4} /></mesh>
+      <mesh position={[W/2, H/2, -16.5]}><boxGeometry args={[0.1, H, 7]} /><meshStandardMaterial color="#FBBF24" transparent opacity={alpha} emissive="#FBBF24" emissiveIntensity={0.4} /></mesh>
+
+      {/* 6F → 5F 走廊 (垂直, x=0, z: -44→-48, 6F在前) */}
+      <mesh position={[0, 0.02, -46]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[W, 4]} />
+        <meshStandardMaterial color="#F472B6" transparent opacity={0.15} emissive="#F472B6" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[-W/2, H/2, -46]}><boxGeometry args={[0.1, H, 4]} /><meshStandardMaterial color="#F472B6" transparent opacity={alpha} emissive="#F472B6" emissiveIntensity={0.4} /></mesh>
+      <mesh position={[W/2, H/2, -46]}><boxGeometry args={[0.1, H, 4]} /><meshStandardMaterial color="#F472B6" transparent opacity={alpha} emissive="#F472B6" emissiveIntensity={0.4} /></mesh>
+
+      {/* 4F → 2F 走廊 (水平, z=0, x: 17→20) */}
+      <mesh position={[18.5, 0.02, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[7, W]} />
+        <meshStandardMaterial color="#4ADE80" transparent opacity={0.15} emissive="#4ADE80" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[18.5, H/2, -W/2]}><boxGeometry args={[7, H, 0.1]} /><meshStandardMaterial color="#4ADE80" transparent opacity={alpha} emissive="#4ADE80" emissiveIntensity={0.4} /></mesh>
+      <mesh position={[18.5, H/2, W/2]}><boxGeometry args={[7, H, 0.1]} /><meshStandardMaterial color="#4ADE80" transparent opacity={alpha} emissive="#4ADE80" emissiveIntensity={0.4} /></mesh>
+
+      {/* 4F → 3F 走廊 (水平, z=0, x: -20→-17) */}
+      <mesh position={[-18.5, 0.02, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[7, W]} />
+        <meshStandardMaterial color="#60A5FA" transparent opacity={0.15} emissive="#60A5FA" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[-18.5, H/2, -W/2]}><boxGeometry args={[7, H, 0.1]} /><meshStandardMaterial color="#60A5FA" transparent opacity={alpha} emissive="#60A5FA" emissiveIntensity={0.4} /></mesh>
+      <mesh position={[-18.5, H/2, W/2]}><boxGeometry args={[7, H, 0.1]} /><meshStandardMaterial color="#60A5FA" transparent opacity={alpha} emissive="#60A5FA" emissiveIntensity={0.4} /></mesh>
+    </group>
+  );
+}
+
+// ── 区域围墙 ─────────────────────────────────────────────────────────────
+function ZoneWalls({ x, z, width, depth, glowColor }: { x: number; z: number; width: number; depth: number; glowColor: string }) {
+  const H = 2.8;
+  const T = 0.1;
+  const alpha = 0.22;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, H/2, -halfD]}><boxGeometry args={[width, H, T]} /><meshStandardMaterial color={glowColor} transparent opacity={alpha} emissive={glowColor} emissiveIntensity={0.35} /></mesh>
+      <mesh position={[0, H/2, halfD]}><boxGeometry args={[width, H, T]} /><meshStandardMaterial color={glowColor} transparent opacity={alpha} emissive={glowColor} emissiveIntensity={0.35} /></mesh>
+      <mesh position={[-halfW, H/2, 0]}><boxGeometry args={[T, H, depth]} /><meshStandardMaterial color={glowColor} transparent opacity={alpha} emissive={glowColor} emissiveIntensity={0.35} /></mesh>
+      <mesh position={[halfW, H/2, 0]}><boxGeometry args={[T, H, depth]} /><meshStandardMaterial color={glowColor} transparent opacity={alpha} emissive={glowColor} emissiveIntensity={0.35} /></mesh>
+    </group>
+  );
+}
+
 function Scene() {
   return (
     <>
@@ -2561,6 +2630,17 @@ function Scene() {
       <directionalLight position={[55, 80, 0]} intensity={1.2} color="#d8e8f8" />
       <pointLight position={[55, 50, 0]} intensity={2} color="#ffffff" distance={600} />
 
+      <Corridors />
+
+      {/* 区域围墙 */}
+      <ZoneWalls x={FLOOR_XZ['1f'][0]} z={FLOOR_XZ['1f'][1]} width={20} depth={12} glowColor={FLOORS[0].glowColor} />
+      <ZoneWalls x={FLOOR_XZ['2f'][0]} z={FLOOR_XZ['2f'][1]} width={20} depth={12} glowColor={FLOORS[1].glowColor} />
+      <ZoneWalls x={FLOOR_XZ['3f'][0]} z={FLOOR_XZ['3f'][1]} width={20} depth={12} glowColor={FLOORS[2].glowColor} />
+      <ZoneWalls x={FLOOR_XZ['4f'][0]} z={FLOOR_XZ['4f'][1]} width={34} depth={26} glowColor={FLOORS[3].glowColor} />
+      <ZoneWalls x={FLOOR_XZ['5f'][0]} z={FLOOR_XZ['5f'][1]} width={30} depth={24} glowColor={FLOORS[4].glowColor} />
+      <ZoneWalls x={FLOOR_XZ['6f'][0]} z={FLOOR_XZ['6f'][1]} width={30} depth={24} glowColor={FLOORS[5].glowColor} />
+
+      {/* 区域内容 */}
       <group position={[FLOOR_XZ['1f'][0], 0, FLOOR_XZ['1f'][1]]}><ZoneLobby /></group>
       <group position={[FLOOR_XZ['2f'][0], 0, FLOOR_XZ['2f'][1]]}><ZoneHR /></group>
       <group position={[FLOOR_XZ['3f'][0], 0, FLOOR_XZ['3f'][1]]}><ZoneProject /></group>

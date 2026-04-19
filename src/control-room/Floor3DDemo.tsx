@@ -3575,7 +3575,6 @@ export default function Floor3DDemo() {
         />
         <pointLight position={[-5, 5, -5]} intensity={0.8} color="#4a6a9a" />
         <Floor3DScene floorId={currentFloor} floorIndex={floorIndex} />
-        <AllFloorsStack currentFloor={currentFloor} />
         <fog attach="fog" args={['#0a0a14', 20, 50]} />
       </Canvas>
       </div>

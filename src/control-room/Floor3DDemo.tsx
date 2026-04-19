@@ -1854,6 +1854,97 @@ function SoftTube({ x, z, color }: { x: number; z: number; color: string }) {
   );
 }
 
+
+// ── 核心软管光效组件 ─────────────────────────────────────────────────────
+const RING_COUNT = 6;
+
+function CoreTube({ nx, nz, color, label, index, totalCount }: {
+  nx: number; nz: number; color: string; label: string; index: number; totalCount: number
+}) {
+  const ringRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const tubeRef = useRef<THREE.Mesh>(null);
+  const elapsed = useRef(0);
+
+  // Core: [0, 2.2, 0], Terminal: [nx, 1.2, nz]
+  const dx = nx, dy = -1.0, dz = nz;
+  const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+  // Rotation: align cylinder Y-axis to direction (nx, -1, nz)
+  const cLen = Math.sqrt(nz * nz + nx * nx);
+  const angle = Math.atan2(cLen, -1.0);
+  const ax = cLen > 0.001 ? nz / cLen : 0;
+  const az = cLen > 0.001 ? -nx / cLen : 0;
+  const qx = ax * Math.sin(angle / 2);
+  const qy = 0;
+  const qz = az * Math.sin(angle / 2);
+  const qw = Math.cos(angle / 2);
+
+  useFrame((_, delta) => {
+    elapsed.current += delta;
+    const t = elapsed.current;
+    const speed = 1.2;
+    ringRefs.current.forEach((ring, j) => {
+      if (!ring) return;
+      const phase = (j + 1) / (RING_COUNT + 1);
+      const offset = index * (Math.PI * 2 / totalCount);
+      const flow = ((t * speed + phase * 4 + offset) % 4) / 4;
+      const intensity = Math.sin(flow * Math.PI) * 3.5 + 0.4;
+      (ring.material as THREE.MeshStandardMaterial).emissiveIntensity = intensity;
+    });
+  });
+
+  return (
+    <group>
+      {/* Base dim tube */}
+      <mesh
+        ref={tubeRef}
+        position={[nx / 2, 1.7, nz / 2]}
+        quaternion={[qx, qy, qz, qw]}
+      >
+        <cylinderGeometry args={[0.04, 0.04, len, 6]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.12} transparent opacity={0.25} />
+      </mesh>
+      {/* Flowing rings */}
+      {Array.from({ length: RING_COUNT }, (_, j) => (
+        <mesh
+          key={j}
+          ref={el => { ringRefs.current[j] = el; }}
+          position={[nx / 2, 1.7, nz / 2]}
+          quaternion={[qx, qy, qz, qw]}
+        >
+          <torusGeometry args={[0.08, 0.03, 6, 16]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} transparent opacity={0.8} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function CoreTubes({ terminalNodes, RING_RADIUS }: {
+  terminalNodes: Array<{ angle: number; color: string; label: string; key: string; isMe: boolean }>;
+  RING_RADIUS: number;
+}) {
+  return (
+    <group>
+      {terminalNodes.map(({ angle, color, label }, i) => {
+        const nx = Math.sin(angle) * RING_RADIUS;
+        const nz = Math.cos(angle) * RING_RADIUS;
+        return (
+          <CoreTube
+            key={label}
+            nx={nx}
+            nz={nz}
+            color={color}
+            label={label}
+            index={i}
+            totalCount={terminalNodes.length}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
 // ===========================================
 // 单个楼层3D场景
 // ===========================================
@@ -2365,6 +2456,8 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
             </group>
           );
         })}
+
+        <CoreTubes terminalNodes={terminalNodes} RING_RADIUS={RING_RADIUS} />
 
         {/* ===== Ambient fog particles ===== */}
         {Array.from({ length: 24 }, (_, i) => {

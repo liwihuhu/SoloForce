@@ -462,6 +462,28 @@ function ZoneLobby() {
       <meshStandardMaterial color={c.glowColor} transparent opacity={0.12} depthWrite={false} />
     </mesh>
 
+    {/* ===== 地板发光边框 ===== */}
+    {/* 底边 */}
+    <mesh position={[0, 0.003, -6.0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+    {/* 顶边 */}
+    <mesh position={[0, 0.003, 6.0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[16, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+    {/* 左边 */}
+    <mesh position={[-8.0, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+      <planeGeometry args={[12, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+    {/* 右边 */}
+    <mesh position={[8.0, 0.003, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+      <planeGeometry args={[12, 0.08]} />
+      <meshStandardMaterial color={c.glowColor} emissive={c.glowColor} emissiveIntensity={1.2} />
+    </mesh>
+
     {/* ===== 中央巨型 SoloForce 品牌大屏 ===== */}
     <group position={[0, 3.2, -5.0]}>
       {/* 屏幕框架 */}

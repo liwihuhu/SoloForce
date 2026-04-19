@@ -1872,6 +1872,19 @@ function ZoneCommand() {
       <planeGeometry args={[34, 26]} />
       <meshStandardMaterial color={c.glowColor} transparent opacity={0.3} depthWrite={false} />
     </mesh>
+    {/* 地板 SoloForce 标识文字 */}
+    <Text
+      position={[0, 0.008, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      fontSize={6}
+      color={c.glowColor}
+      anchorX="center"
+      anchorY="middle"
+      fontWeight={700}
+      letterSpacing={0.15}
+    >
+      SoloForce
+    </Text>
 
     {/* ===== 地板发光边框 ===== */}
     <mesh position={[0, 0.003, -13]} rotation={[-Math.PI / 2, 0, 0]}>

@@ -1874,7 +1874,7 @@ function ZoneCommand() {
     </mesh>
     {/* 地板 SoloForce 标识文字 */}
     <Text
-      position={[0, 0.008, 0]}
+      position={[0, 0.008, -3]}
       rotation={[-Math.PI / 2, 0, 0]}
       fontSize={4}
       color={c.glowColor}

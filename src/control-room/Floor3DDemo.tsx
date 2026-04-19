@@ -1862,10 +1862,10 @@ function CurvedTube({ nx, nz, color, index, total }: { nx: number; nz: number; c
   const meshRef = useRef<THREE.Mesh>(null!);
   const elapsed = useRef(0);
 
-  // 核心[0,2.2,0] → 弧形弯管 → 终端[nx,1.2,nz]
-  // 控制点：从核心出发时水平方向弯折，产生自然弧度
-  const midX = nx * 0.55 + (nz > 0 ? -0.3 : 0.3);
-  const midY = 1.8 + Math.abs(nz) * 0.08;
+  // 核心[0,2.2,0] → 弧形弯管(向下凹陷) → 终端[nx,1.2,nz]
+  // 控制点：中间点下压，产生自然下垂弧度
+  const midX = nx * 0.55;
+  const midY = 0.5;  // 大幅低于起止点，产生明显下垂
   const midZ = nz * 0.55;
 
   const curve = useMemo(() => new THREE.CatmullRomCurve3([
@@ -1913,7 +1913,7 @@ function CurvedTube({ nx, nz, color, index, total }: { nx: number; nz: number; c
 
   return (
     <mesh ref={meshRef}>
-      <tubeGeometry args={[curve, 24, 0.06, 8, false]} />
+      <tubeGeometry args={[curve, 32, 0.06, 8, false]} />
       <meshStandardMaterial
         color={color + '66'}
         emissive={color}

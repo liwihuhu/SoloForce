@@ -2418,8 +2418,8 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
           <pointLight intensity={5.0} color={config.glowColor} distance={14} />
 
           {/* 核心顶背对背双屏 — 两屏背对背立于核心上方 */}
-          {/* 左屏：朝左 (rotation.y = π/2) */}
-          <group position={[-0.28, 1.6, 0]} rotation={[0, Math.PI / 2, 0]}>
+          {/* 左屏：朝左 (rotation.y = -π/2，即3π/2) */}
+          <group position={[-0.28, 1.6, 0]} rotation={[0, -Math.PI / 2, 0]}>
             <mesh position={[0, 0, 0]}>
               <boxGeometry args={[1.0, 0.9, 0.04]} />
               <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.1} />

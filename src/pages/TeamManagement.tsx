@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTopologyStore } from '../store';
-import { DEFAULT_EMPLOYEES } from '../types';
+import type { Employee } from '../types';
 
 const API_BASE = 'http://localhost:5301';
 
@@ -33,6 +33,7 @@ const defaultFormData: TeamFormData = {
 
 export default function TeamManagement() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
@@ -57,8 +58,22 @@ export default function TeamManagement() {
     setLoading(false);
   };
 
+  // 加载员工数据
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/employees`);
+      const data = await res.json();
+      if (data.success) {
+        setEmployees(data.data.items);
+      }
+    } catch (error) {
+      console.error('加载员工失败:', error);
+    }
+  };
+
   useEffect(() => {
     fetchTeams();
+    fetchEmployees();
   }, []);
 
   // 打开新增弹窗
@@ -164,7 +179,7 @@ export default function TeamManagement() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: '临时保存',
-            memberIds: DEFAULT_EMPLOYEES.map(e => e.id),
+            memberIds: employees.length > 0 ? employees.map((e: Employee) => e.id) : team.memberIds,
             relationships: currentRelationships,
           }),
         });
@@ -190,7 +205,7 @@ export default function TeamManagement() {
     setFormData({ ...formData, memberIds: newMembers });
   };
 
-  const getEmployee = (id: string) => DEFAULT_EMPLOYEES.find(e => e.id === id);
+  const getEmployee = (id: string) => employees.find(e => e.id === id);
 
   return (
     <div style={{ padding: '24px', height: '100%', overflow: 'auto', background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)' }}>
@@ -508,7 +523,7 @@ export default function TeamManagement() {
                   borderRadius: '12px',
                   background: 'rgba(15, 23, 42, 0.5)',
                 }}>
-                  {DEFAULT_EMPLOYEES.map(emp => {
+                  {employees.map(emp => {
                     const isSelected = formData.memberIds.includes(emp.id);
                     const isRequired = emp.id === 'emp-0' || emp.id === 'emp-exec';
                     
@@ -541,6 +556,11 @@ export default function TeamManagement() {
                       </div>
                     );
                   })}
+                  {!employees.length && (
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '20px', color: '#64748B' }}>
+                      暂无可用员工，请先添加员工
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

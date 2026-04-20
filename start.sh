@@ -92,8 +92,13 @@ start_server() {
     log_warn "请编辑 .env 文件配置 API Key"
   fi
 
+  # 加载 .env 文件中的环境变量
+  set -a
+  source .env
+  set +a
+
   # 启动后端（重定向所有输出到日志文件）
-  npm run server > "$LOG_FILE" 2>&1 &
+  npm run server >> "$LOG_FILE" 2>&1 &
   SERVER_PID=$!
 
   log_info "后端 PID: $SERVER_PID"

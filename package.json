@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5300",
-    "server": "tsx server.ts --port 5301",
+    "server": "tsx --env-file=.env server.ts --port 5301",
     "dev:all": "npm run server & npm run dev",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -17,6 +17,7 @@
     "@types/three": "^0.184.0",
     "@xyflow/react": "^12.10.1",
     "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

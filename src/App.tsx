@@ -14,6 +14,7 @@ import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import TeamTopology from './pages/TeamTopology';
 import TeamManagement from './pages/TeamManagement';
+import MeetingRoom from './pages/MeetingRoom';
 import EmployeeManagement from './pages/EmployeeManagement';
 import TaskCenter from './pages/TaskCenter';
 import Settings from './pages/Settings';
@@ -499,6 +500,12 @@ export default function App() {
           团队拓扑
         </NavLink>
         <NavLink 
+          active={currentPage === '/meeting'} 
+          onClick={() => navigate('/meeting')}
+        >
+          会议室
+        </NavLink>
+        <NavLink 
           active={currentPage === '/teams'} 
           onClick={() => navigate('/teams')}
         >
@@ -545,6 +552,7 @@ export default function App() {
           <Route path="/" element={<Floor3DDemo />} />
           <Route path="/flat" element={<FloorFlatDemo />} />
           <Route path="/topology" element={<MainView />} />
+          <Route path="/meeting" element={<MeetingRoom />} />
           <Route path="/teams" element={<TeamManagement />} />
           <Route path="/employees" element={<EmployeeManagement />} />
           <Route path="/tasks" element={<TaskCenter />} />

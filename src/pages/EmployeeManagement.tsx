@@ -1,24 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { Employee, EmployeeType, EmployeeStatus } from '../types';
-import { EMPLOYEE_TYPE_CONFIG, EMPLOYEE_AVATARS } from '../types';
+import { EMPLOYEE_TYPE_CONFIG, EMPLOYEE_AVATARS, INDUSTRY_TEMPLATES, getAllRoleTypes } from '../types';
 
 const API_BASE = 'http://localhost:5301';
-
-// 员工类型选项
-const EMPLOYEE_TYPES: { value: EmployeeType; label: string; color: string }[] = [
-  { value: 'superadmin', label: '董事长', color: '#F59E0B' },
-  { value: 'executor', label: 'OpenClaw执行官', color: '#DC2626' },
-  { value: 'manager', label: '经理', color: '#7C3AED' },
-  { value: 'developer', label: '开发工程师', color: '#2563EB' },
-  { value: 'designer', label: '设计师', color: '#DB2777' },
-  { value: 'analyst', label: '数据分析师', color: '#059669' },
-  { value: 'writer', label: '内容创作者', color: '#D97706' },
-  { value: 'support', label: '客户支持', color: '#0891B2' },
-  { value: 'researcher', label: '技术研究员', color: '#7C3AED' },
-  { value: 'qa', label: '测试工程师', color: '#DC2626' },
-  { value: 'devops', label: '运维工程师', color: '#4B5563' },
-  { value: 'sales', label: '销售', color: '#EA580C' },
-];
 
 // 状态选项
 const STATUS_OPTIONS: { value: EmployeeStatus; label: string; color: string }[] = [
@@ -27,25 +11,30 @@ const STATUS_OPTIONS: { value: EmployeeStatus; label: string; color: string }[] 
   { value: 'offline', label: '离线', color: '#6B7280' },
 ];
 
+// 所有角色类型
+const ALL_ROLE_TYPES = getAllRoleTypes();
+
 interface EmployeeFormData {
   name: string;
   type: EmployeeType;
+  industry: string;
   roleName: string;
   department: string;
-  description: string;
+  description: string;  // AI角色提示词
   avatar: string;
-  expertise: string;
+  expertise: string[];  // 改为数组
   responsibilities: string;
 }
 
 const defaultFormData: EmployeeFormData = {
   name: '',
   type: 'developer',
+  industry: 'tech',
   roleName: '',
   department: '',
   description: '',
   avatar: EMPLOYEE_AVATARS.developer,
-  expertise: '',
+  expertise: [],
   responsibilities: '',
 };
 
@@ -55,6 +44,9 @@ export default function EmployeeManagement() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [newExpertise, setNewExpertise] = useState('');  // 新增专业输入
+  const [customIndustry, setCustomIndustry] = useState('');  // 自定义行业
+  const [customRole, setCustomRole] = useState('');  // 自定义角色
   
   // 弹窗状态
   const [showModal, setShowModal] = useState(false);
@@ -62,6 +54,72 @@ export default function EmployeeManagement() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState<EmployeeFormData>(defaultFormData);
   const [submitting, setSubmitting] = useState(false);
+
+  // 根据行业获取角色列表
+  const getRolesByIndustry = (industryId: string) => {
+    if (industryId === 'custom') return [];
+    const industry = INDUSTRY_TEMPLATES.find(i => i.id === industryId);
+    return industry?.roles || [];
+  };
+
+  // 根据角色类型获取预设专业
+  const getExpertiseByType = (type: EmployeeType): string[] => {
+    for (const industry of INDUSTRY_TEMPLATES) {
+      const role = industry.roles.find(r => r.type === type);
+      if (role) return role.expertise;
+    }
+    return [];
+  };
+
+  // 获取角色颜色
+  const getRoleColor = (type: EmployeeType): string => {
+    const role = ALL_ROLE_TYPES.find(r => r.value === type);
+    return role?.color || '#6B7280';
+  };
+
+  // 行业变化时更新角色和专业
+  const handleIndustryChange = (industryId: string) => {
+    const roles = getRolesByIndustry(industryId);
+    const defaultRole = roles[0];
+    setFormData({
+      ...formData,
+      industry: industryId,
+      type: defaultRole?.type || 'custom',
+      roleName: defaultRole?.label || '',
+      expertise: defaultRole?.expertise || [],
+    });
+  };
+
+  // 角色变化时更新专业
+  const handleRoleChange = (type: EmployeeType) => {
+    const roleConfig = ALL_ROLE_TYPES.find(r => r.value === type);
+    const expertise = getExpertiseByType(type);
+    setFormData({
+      ...formData,
+      type,
+      roleName: roleConfig?.label || '',
+      expertise: expertise.length > 0 ? expertise : formData.expertise,
+    });
+  };
+
+  // 添加专业标签
+  const addExpertise = (exp: string) => {
+    if (exp.trim() && !formData.expertise.includes(exp.trim())) {
+      setFormData({
+        ...formData,
+        expertise: [...formData.expertise, exp.trim()],
+      });
+    }
+    setNewExpertise('');
+  };
+
+  // 删除专业标签
+  const removeExpertise = (exp: string) => {
+    setFormData({
+      ...formData,
+      expertise: formData.expertise.filter(e => e !== exp),
+    });
+  };
 
   // 加载员工数据
   const fetchEmployees = async () => {
@@ -102,11 +160,12 @@ export default function EmployeeManagement() {
     setFormData({
       name: emp.name,
       type: emp.type,
+      industry: (emp as any).industry || 'tech',
       roleName: emp.roleName || '',
       department: emp.department || '',
       description: emp.description,
       avatar: emp.avatar,
-      expertise: emp.expertise?.join(', ') || '',
+      expertise: emp.expertise || [],
       responsibilities: emp.responsibilities?.join(', ') || '',
     });
     setShowModal(true);
@@ -122,8 +181,14 @@ export default function EmployeeManagement() {
     setSubmitting(true);
     try {
       const payload = {
-        ...formData,
-        expertise: formData.expertise.split(',').map(s => s.trim()).filter(Boolean),
+        name: formData.name,
+        type: formData.type,
+        industry: formData.industry,
+        roleName: formData.roleName || formData.type,
+        department: formData.department,
+        description: formData.description,  // AI角色提示词
+        avatar: formData.avatar,
+        expertise: formData.expertise,
         responsibilities: formData.responsibilities.split(',').map(s => s.trim()).filter(Boolean),
       };
 
@@ -258,7 +323,7 @@ export default function EmployeeManagement() {
             }}
           >
             <option value="" style={{ background: '#1E293B' }}>全部类型</option>
-            {EMPLOYEE_TYPES.map(t => (
+            {ALL_ROLE_TYPES.map(t => (
               <option key={t.value} value={t.value} style={{ background: '#1E293B' }}>{t.label}</option>
             ))}
           </select>
@@ -388,7 +453,7 @@ export default function EmployeeManagement() {
                     color: typeConfig.color,
                     border: `1px solid ${typeConfig.color}30`,
                   }}>
-                    {EMPLOYEE_TYPES.find(t => t.value === emp.type)?.label || emp.type}
+                    {ALL_ROLE_TYPES.find(t => t.value === emp.type)?.label || emp.type}
                   </span>
                   {emp.department && (
                     <span style={{ marginLeft: '10px', fontSize: '13px', color: '#64748B' }}>
@@ -542,14 +607,14 @@ export default function EmployeeManagement() {
                 />
               </div>
 
-              {/* 类型 */}
+              {/* 行业选择 */}
               <div>
                 <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
-                  类型 <span style={{ color: '#EF4444' }}>*</span>
+                  行业 <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <select
-                  value={formData.type}
-                  onChange={e => setFormData({ ...formData, type: e.target.value as EmployeeType, avatar: EMPLOYEE_AVATARS[e.target.value as EmployeeType] })}
+                  value={formData.industry}
+                  onChange={e => handleIndustryChange(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '12px 16px',
@@ -561,48 +626,205 @@ export default function EmployeeManagement() {
                     outline: 'none',
                   }}
                 >
-                  {EMPLOYEE_TYPES.map(t => (
-                    <option key={t.value} value={t.value} style={{ background: '#1E293B' }}>{t.label}</option>
+                  {INDUSTRY_TEMPLATES.map(ind => (
+                    <option key={ind.id} value={ind.id} style={{ background: '#1E293B' }}>
+                      {ind.icon} {ind.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              {/* 角色名 */}
+              {/* 自定义行业输入 */}
+              {formData.industry === 'custom' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
+                    自定义行业名称
+                  </label>
+                  <input
+                    type="text"
+                    value={customIndustry}
+                    onChange={e => setCustomIndustry(e.target.value)}
+                    placeholder="输入自定义行业名称"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      border: '1px solid rgba(148, 163, 184, 0.3)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      color: '#F1F5F9',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* 角色类型 */}
               <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#374151' }}>
-                  角色名称
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                  角色类型 <span style={{ color: '#EF4444' }}>*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.roleName}
-                  onChange={e => setFormData({ ...formData, roleName: e.target.value })}
-                  placeholder="如：后端开发工程师"
+                {formData.industry !== 'custom' ? (
+                  <select
+                    value={formData.type}
+                    onChange={e => handleRoleChange(e.target.value as EmployeeType)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      color: '#F1F5F9',
+                      outline: 'none',
+                    }}
+                  >
+                    {getRolesByIndustry(formData.industry).map(role => (
+                      <option key={role.type} value={role.type} style={{ background: '#1E293B' }}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={customRole}
+                    onChange={e => {
+                      setCustomRole(e.target.value);
+                      setFormData({ ...formData, type: 'custom', roleName: e.target.value });
+                    }}
+                    placeholder="输入自定义角色名称"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      border: '1px solid rgba(148, 163, 184, 0.3)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      color: '#F1F5F9',
+                      outline: 'none',
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* 专业领域（标签） */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                  专业领域
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                  {formData.expertise.map(exp => (
+                    <span
+                      key={exp}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'rgba(139, 92, 246, 0.2)',
+                        border: `1px solid ${getRoleColor(formData.type)}50`,
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        color: '#C4B5FD',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      {exp}
+                      <button
+                        onClick={() => removeExpertise(exp)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#A78BFA',
+                          cursor: 'pointer',
+                          padding: '0',
+                          fontSize: '14px',
+                          lineHeight: 1,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={newExpertise}
+                    onChange={e => setNewExpertise(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addExpertise(newExpertise))}
+                    placeholder="输入专业技能后按回车添加"
+                    style={{
+                      flex: 1,
+                      padding: '10px 14px',
+                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      color: '#F1F5F9',
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={() => addExpertise(newExpertise)}
+                    style={{
+                      padding: '10px 16px',
+                      background: 'rgba(139, 92, 246, 0.2)',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      borderRadius: '8px',
+                      color: '#A78BFA',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    添加
+                  </button>
+                </div>
+              </div>
+
+              {/* 角色描述（AI提示词） */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                  🤖 AI角色提示词 <span style={{ fontSize: '12px', color: '#64748B' }}>（用于会议协商时定义AI行为）</span>
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  rows={4}
+                  placeholder="定义这个角色的AI行为..."
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '6px',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '10px',
                     fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: '#F1F5F9',
+                    outline: 'none',
+                    resize: 'vertical',
                   }}
                 />
               </div>
 
               {/* 部门 */}
               <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#374151' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
                   部门
                 </label>
                 <input
                   type="text"
                   value={formData.department}
                   onChange={e => setFormData({ ...formData, department: e.target.value })}
-                  placeholder="如：技术部"
+                  placeholder="如：技术部、投行部"
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '6px',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '10px',
                     fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: '#F1F5F9',
+                    outline: 'none',
                   }}
                 />
               </div>
@@ -716,30 +938,10 @@ export default function EmployeeManagement() {
                 />
               </div>
 
-              {/* 技能 */}
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#374151' }}>
-                  擅长技能（逗号分隔）
-                </label>
-                <input
-                  type="text"
-                  value={formData.expertise}
-                  onChange={e => setFormData({ ...formData, expertise: e.target.value })}
-                  placeholder="如：Java, Python, 数据库"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-
               {/* 职责 */}
               <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#374151' }}>
-                  职责（逗号分隔）
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                  职责
                 </label>
                 <input
                   type="text"
@@ -748,10 +950,13 @@ export default function EmployeeManagement() {
                   placeholder="如：后端开发, 接口实现"
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '6px',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '10px',
                     fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: '#F1F5F9',
+                    outline: 'none',
                   }}
                 />
               </div>

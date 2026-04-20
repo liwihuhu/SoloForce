@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, execFileSync, spawn } from 'child_process';
@@ -327,6 +328,16 @@ app.use(express.json({ limit: '10mb' }));
 let ocStatusCache: { data: any; ts: number } = { data: null, ts: 0 };
 const OC_CACHE_TTL = 10000; // 10秒缓存
 
+function getSkillsAndMcpCount() {
+  try {
+    const skillsDir = os.homedir() + '/.openclaw/skills';
+    const extensionsDir = os.homedir() + '/.openclaw/extensions';
+    const skills = fs.existsSync(skillsDir) ? fs.readdirSync(skillsDir).filter(f => !f.endsWith('.skill') && !f.startsWith('.')).length : 0;
+    const mcp = fs.existsSync(extensionsDir) ? fs.readdirSync(extensionsDir).filter(f => !f.startsWith('.')).length : 0;
+    return { skills, mcp };
+  } catch { return { skills: 0, mcp: 0 }; }
+}
+
 function parseOpenClawStatus(output: string) {
   // 处理 UTF-8 box-drawing 和 middle-dot 字符
   const clean = output
@@ -338,16 +349,23 @@ function parseOpenClawStatus(output: string) {
   const data = {
     gateway: { reachable: false, latency: null },
     agents: { count: 0, sessions: 0 },
-    memory: { files: 0, chunks: 0 },
-    tasks: { active: 0, queued: 0, running: 0, tracked: 0 },
-    sessions: { active: 0 },
+    memory: { files: 0, chunks: 0, cache: null as string | null },
+    tasks: { active: 0, queued: 0, running: 0, tracked: 0, issues: 0 },
+    sessions: { active: 0, model: '' },
+    security: { critical: 0, warn: 0, info: 0 },
+    heartbeat: { interval: '', target: '' },
+    tailscale: 'off',
+    channel: '',
+    version: '',
+    os: '',
+    uptime: 0,
+    skills: 0,
+    mcp: 0,
   };
 
   const gm = clean.match(/reachable\s+(\d+)ms/);
   if (gm) { data.gateway.reachable = true; data.gateway.latency = parseInt(gm[1]); }
 
-
-  // Agents: "Agents 1 · 1 bootstrap file present · sessions 2"
   const am = clean.match(/Agents\s+(\d+).*?sessions\s+(\d+)/);
   if (am) { data.agents.count = parseInt(am[1]); data.agents.sessions = parseInt(am[2]); }
 
@@ -355,15 +373,38 @@ function parseOpenClawStatus(output: string) {
   const cm = clean.match(/(\d+)\s+chunks/);
   if (fm) data.memory.files = parseInt(fm[1]);
   if (cm) data.memory.chunks = parseInt(cm[1]);
+  const cacheM = clean.match(/cache\s+(on|off)\s*\((\d+)\)/);
+  if (cacheM) data.memory.cache = `on(${cacheM[2]})`;
 
   const tm = clean.match(/(\d+)\s+active.*?(\d+)\s+queued.*?(\d+)\s+running/);
   if (tm) { data.tasks.active = parseInt(tm[1]); data.tasks.queued = parseInt(tm[2]); data.tasks.running = parseInt(tm[3]); }
   const trm = clean.match(/(\d+)\s+tracked/);
   if (trm) data.tasks.tracked = parseInt(trm[1]);
+  const issuesM = clean.match(/(\d+)\s+issues/);
+  if (issuesM) data.tasks.issues = parseInt(issuesM[1]);
 
   const sm = clean.match(/Sessions\s+(\d+)\s+active/);
   if (sm) data.sessions.active = parseInt(sm[1]);
+  const modelM = clean.match(/default\s+([\w.-]+)\s+\(/);
+  if (modelM) data.sessions.model = modelM[1];
 
+  const secM = clean.match(/(\d+)\s+critical.*?(\d+)\s+warn.*?(\d+)\s+info/);
+  if (secM) { data.security.critical = parseInt(secM[1]); data.security.warn = parseInt(secM[2]); data.security.info = parseInt(secM[3]); }
+
+  const hbM = clean.match(/Heartbeat\s+(\S+)\s+\((\w+)\)/);
+  if (hbM) { data.heartbeat.interval = hbM[1]; data.heartbeat.target = hbM[2]; }
+
+  const tsM = clean.match(/Tailscale\s+(on|off)/);
+  if (tsM) data.tailscale = tsM[1];
+
+  const chM = clean.match(/Channel\s+(stable|beta|\S+)/);
+  if (chM) data.channel = chM[1];
+
+  const verM = clean.match(/latest\s+(\d+\.\d+\.\d+)/);
+  if (verM) data.version = verM[1];
+
+  const osM = clean.match(/OS\s+(macos[\s\d.+]+?)\s+/);
+  if (osM) data.os = osM[1].trim();
 
   return data;
 }
@@ -377,10 +418,17 @@ app.get('/api/openclaw-status', (req, res) => {
   // 使用 spawn 异步执行避免阻塞
   const p = spawn('/opt/homebrew/bin/openclaw', ['status'], { timeout: 20000 });
   let out = '';
+  let done = false; // 防止重复响应
   p.stdout.on('data', d => out += d.toString());
   p.on('close', (code) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
     if (code === 0 && out.length > 0) {
       const data = parseOpenClawStatus(out);
+      const { skills, mcp } = getSkillsAndMcpCount();
+      data.skills = skills;
+      data.mcp = mcp;
       ocStatusCache = { data, ts: now };
       res.json({ success: true, data });
     } else if (ocStatusCache.data) {
@@ -390,19 +438,22 @@ app.get('/api/openclaw-status', (req, res) => {
     }
   });
   p.on('error', (e) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
     if (ocStatusCache.data) {
       res.json({ success: true, data: ocStatusCache.data, stale: true });
     } else {
-      res.json({ success: false, error: e.message });
+      res.status(500).json({ success: false, error: e.message });
     }
   });
   // 20秒超时保底
-  setTimeout(() => {
+  const timer = setTimeout(() => {
+    if (done) return;
+    done = true;
     p.kill();
-    if (!res.headersSent) {
-      if (ocStatusCache.data) res.json({ success: true, data: ocStatusCache.data, stale: true });
-      else res.status(504).json({ success: false, error: 'timeout' });
-    }
+    if (ocStatusCache.data) res.json({ success: true, data: ocStatusCache.data, stale: true });
+    else res.status(504).json({ success: false, error: 'timeout' });
   }, 20000);
 });
 
@@ -993,30 +1044,50 @@ app.get('/api/files', (req, res) => {
 
 // 调用大模型
 async function callLLM(messages: { role: string; content: string }[]): Promise<string> {
-  try {
-    const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
+  return new Promise((resolve, reject) => {
+    import('node:https').then(({ default: https }) => {
+      const body = Buffer.from(JSON.stringify({
         model: OPENAI_MODEL,
         messages,
         temperature: 0.7,
         max_tokens: 2048
-      })
-    });
+      }), 'utf8');
 
-    const data = await response.json();
-    if (data.choices && data.choices[0]) {
-      return data.choices[0].message.content;
-    }
-    throw new Error('LLM响应格式错误');
-  } catch (error) {
-    console.error('LLM调用失败:', error);
-    throw error;
-  }
+      const options = {
+        hostname: 'api.siliconflow.cn',
+        port: 443,
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Length': body.byteLength,
+        }
+      };
+
+      const req = https.request(options, (res: any) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          const data = Buffer.concat(chunks).toString('utf8');
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.choices && parsed.choices[0]) {
+              resolve(parsed.choices[0].message.content);
+            } else {
+              reject(new Error('LLM响应格式错误'));
+            }
+          } catch (e) {
+            reject(new Error('解析LLM响应失败'));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    }).catch(reject);
+  });
 }
 
 // 获取某员工的所有下属
@@ -1352,7 +1423,276 @@ app.post('/api/openclaw/execute', async (req, res) => {
   }
 });
 
-// ========== 命令历史 API ==========
+// ========== 协商讨论 API ==========
+
+interface NegotiationRequest {
+  speakerId: string;
+  speakerName: string;
+  speakerType: string;
+  expertise: string[];
+  topic: string;
+  blackboard: {
+    authorName: string;
+    authorType: string;
+    type: string;
+    content: string;
+  }[];
+  userPriorityContent?: string;  // 用户最新发言，优先级最高
+}
+
+// 总结黑板内容接口
+interface SummaryRequest {
+  topic: string;
+  blackboard: {
+    authorName: string;
+    type: string;
+    content: string;
+  }[];
+}
+
+// 专门用于协商的LLM调用（更高温度，更多样化）
+async function callNegotiationLLM(messages: { role: string; content: string }[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    import('node:https').then(({ default: https }) => {
+      const body = Buffer.from(JSON.stringify({
+        model: OPENAI_MODEL,
+        messages,
+        temperature: 0.7,
+        max_tokens: 150,    // 限制最大150字
+        top_p: 0.85,
+        frequency_penalty: 0.6,  // 频率惩罚
+        presence_penalty: 0.4,
+      }), 'utf8');
+
+      const options = {
+        hostname: 'api.siliconflow.cn',
+        port: 443,
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Length': body.byteLength,
+        }
+      };
+
+      const req = https.request(options, (res: any) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          const data = Buffer.concat(chunks).toString('utf8');
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.choices && parsed.choices[0]) {
+              resolve(parsed.choices[0].message.content);
+            } else {
+              reject(new Error('LLM响应格式错误: ' + data.substring(0, 200)));
+            }
+          } catch (e) {
+            reject(new Error('解析LLM响应失败: ' + data.substring(0, 200)));
+          }
+        });
+      });
+
+      req.on('error', (e: Error) => {
+        reject(e);
+      });
+
+      req.write(body);
+      req.end();
+    }).catch(reject);
+  });
+}
+
+// 角色性格描述（让LLM更像这个角色）
+const rolePersonalities: Record<string, string> = {
+  // 企业通用
+  manager: '你是一个经验丰富的项目经理，善于从全局思考问题，关注进度、风险、资源协调。你说话直接务实，喜欢用数据和计划说话。',
+  developer: '你是一个资深技术专家，关注技术可行性、架构设计、代码质量。你说话喜欢用技术术语，逻辑严谨。',
+  designer: '你是一个创意设计师，关注用户体验、视觉美感、交互流程。你说话富有想象力，喜欢举例子说明。',
+  analyst: '你是一个数据分析师，关注数据洞察、市场趋势、用户行为。你说话喜欢用数据支撑观点。',
+  writer: '你是一个文案策划，擅长内容创作，品牌表达、用户沟通。你说话富有感染力，注重表达效果。',
+  support: '你是一个客服主管，关注客户需求、服务流程、问题解决。你说话亲切耐心，注重用户反馈。',
+  researcher: '你是一个技术研究员，关注前沿技术、创新方案、可行性分析。你说话严谨前瞻，喜欢引用行业趋势。',
+  qa: '你是一个测试专家，关注质量把控、风险评估、测试策略。你说话注重细节和边界条件。',
+  devops: '你是一个运维工程师，关注稳定性、部署效率、监控告警。你说话务实，关注SLA和可用性。',
+  sales: '你是一个销售经理，关注客户需求、商务谈判、市场拓展。你说话自信，善于把握客户心理。',
+  // 金融/证券
+  analyst_sec: '你是一个专业的二级市场证券分析师，关注宏观经济、行业动向和个股基本面。你说话严谨客观，注重数据分析和风险提示。',
+  risk_manager: '你是一个资深风控专员，关注信用风险、市场风险和操作风险。你说话谨慎保守，强调合规和风险控制。',
+  trader: '你是一个专业交易员，关注盘面动态、交易机会和资金管理。你说话简洁果断，注重风险收益比。',
+  wealth_advisor: '你是一个专业理财顾问，关注客户资产配置、财富目标和投资偏好。你说话亲切专业，注重长期收益和资产保值。',
+  // 医疗健康
+  doctor: '你是一个资深临床医师，关注疾病诊断、治疗方案和患者管理。你说话严谨专业，注重临床证据和诊疗规范。',
+  pharmacist: '你是一个专业药师，关注药品管理、用药安全和药物相互作用。你说话细致严谨，注重用药说明和禁忌提示。',
+  nurse: '你是一个专业护士，关注护理操作、患者护理和医疗协调。你说话温柔耐心，注重患者感受和护理细节。',
+  // 教育培训
+  teacher: '你是一个资深教师，关注教学方法、学生发展和课堂效果。你说话生动有趣，注重因材施教和启发引导。',
+  curriculum_designer: '你是一个专业课程设计师，关注教学设计、课程开发和学习评估。你说话系统严谨，注重学习目标和效果转化。',
+  // 媒体创意
+  director: '你是一个资深编导，关注节目策划、脚本创作和现场把控。你说话富有创意，注重内容价值和观众体验。',
+  cameraman: '你是一个专业摄像师，关注镜头语言、画面构图和拍摄技巧。你说话技术流，注重光线运用和构图美感。',
+  editor_video: '你是一个专业视频剪辑师，关注剪辑节奏、叙事结构和视觉呈现。你说话有艺术感，注重故事线和情感节奏。',
+  // 制造行业
+  engineer_mech: '你是一个资深工艺工程师，关注工艺设计、生产优化和设备维护。你说话务实严谨，注重工艺参数和质量标准。',
+  quality_inspector: '你是一个专业质检专员，关注质量检验、标准制定和问题分析。你说话严格认真，注重质量把控和缺陷预防。',
+  // 自定义
+  custom: '你是一个专业人士，关注本领域的专业知识和实践经验。你说话专业务实，结合行业特点发表观点。',
+};
+
+// 协商讨论接口
+app.post('/api/negotiate', async (req, res) => {
+  const { speakerId, speakerName, speakerType, expertise, topic, blackboard, userPriorityContent } = req.body as NegotiationRequest;
+
+  if (!speakerId || !topic) {
+    return res.status(400).json({ error: '缺少必要参数' });
+  }
+
+  // 获取黑板上的现有观点
+  const existingOpinions = blackboard
+    .filter(item => item.type === 'opinion' || item.type === 'summary')
+    .slice(-5)
+    .map((item) => `【${item.authorName}】：${item.content}`)
+    .join('\n');
+
+  const questions = blackboard
+    .filter(item => item.type === 'question')
+    .map((item) => `【${item.authorName}提问】：${item.content}`)
+    .join('\n');
+
+  const pendingItems = blackboard
+    .filter(item => item.type === 'pending')
+    .map((item) => `【待处理-${item.authorName}】：${item.content}`)
+    .join('\n');
+
+  // 获取角色性格
+  const personality = rolePersonalities[speakerType] || rolePersonalities['developer'];
+
+  // 构建prompt（用户优先级最高）
+  const prompt = `## 场景
+你正在参加一个团队会议，作为"${speakerName}"（${speakerType}）发言。
+
+## 角色设定
+${personality}
+
+## 你的专长
+${expertise.length > 0 ? expertise.join('、') : '综合能力'}
+
+## 会议议题
+"${topic}"
+
+${userPriorityContent ? `## ⚠️ 仲裁者指示
+"${userPriorityContent}"
+
+【重要】你必须先回应仲裁者的观点！` : ''}
+${questions ? `## ❓ 仲裁者提出的问题（必须正面回答）
+${questions}
+` : ''}
+${existingOpinions ? `## 会议上已经讨论的内容
+${existingOpinions}
+` : ''}
+${pendingItems ? `## ⏳ 待处理的事项
+${pendingItems}
+` : ''}
+
+## 发言要求
+${userPriorityContent ? `1. 【必须】先回应仲裁者的观点（同意/补充/反对）
+2. 【必须】回答仲裁者提出的问题` : '1. 【必须】回答仲裁者提出的问题'}
+3. 然后结合你的专业背景提出见解
+4. 发言口语化，像真实开会
+5. 控制在150字以内
+6. 直接输出，不要前缀
+
+开始发言：`;
+
+  try {
+    const result = await callNegotiationLLM([
+      { role: 'system', content: '你是一个参加会议的专业人士，每次发言要有独特视角，不要重复别人说过的内容。' },
+      { role: 'user', content: prompt }
+    ]);
+
+    // 清理输出
+    const cleanedResult = result.trim();
+
+    res.json({
+      success: true,
+      data: {
+        content: cleanedResult,
+        speakerId,
+        speakerName,
+        speakerType,
+      }
+    });
+  } catch (error) {
+    console.error('协商讨论LLM调用失败:', error);
+    res.status(500).json({ error: '协商讨论失败', details: String(error) });
+  }
+});
+
+// 总结黑板内容接口
+app.post('/api/summarize', async (req, res) => {
+  const { topic, blackboard } = req.body as SummaryRequest;
+
+  if (!topic || !blackboard || blackboard.length === 0) {
+    return res.status(400).json({ error: '缺少必要参数' });
+  }
+
+  // 获取所有观点
+  const allOpinions = blackboard
+    .filter(item => item.type === 'opinion' || item.type === 'summary')
+    .map((item) => `【${item.authorName}（${item.authorType}）】：${item.content}`)
+    .join('\n');
+
+  const questions = blackboard
+    .filter(item => item.type === 'question')
+    .map((item) => `【${item.authorName}提问】：${item.content}`)
+    .join('\n');
+
+  const pendingItems = blackboard
+    .filter(item => item.type === 'pending')
+    .map((item) => `【待处理】：${item.content}`)
+    .join('\n');
+
+  const prompt = `## 会议议题
+"${topic}"
+
+## 讨论内容汇总
+${allOpinions}
+
+${questions ? `## 待解答问题\n${questions}\n\n` : ''}
+${pendingItems ? `## 待处理事项\n${pendingItems}\n\n` : ''}
+
+## 你的任务
+请将以上讨论内容整理成简洁的条例形式，每条不超过20字。格式要求：
+1. 用「•」或「1.」开头
+2. 每条一个核心观点
+3. 合并相似观点
+4. 保留争议点
+5. 只输出条例内容，不要解释
+
+输出示例：
+• 引入Trello管理任务分配
+• 建议增加周会同步进度
+• 技术方案待进一步评估`;
+
+  try {
+    const result = await callNegotiationLLM([
+      { role: 'system', content: '你是一个专业的会议记录员，擅长将讨论内容整理成简洁的条例。' },
+      { role: 'user', content: prompt }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        content: result.trim(),
+        topic,
+      }
+    });
+  } catch (error) {
+    console.error('总结LLM调用失败:', error);
+    res.status(500).json({ error: '总结失败', details: String(error) });
+  }
+});
 
 // 获取命令历史
 app.get('/api/command-history', (req, res) => {

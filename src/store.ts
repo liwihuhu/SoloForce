@@ -90,11 +90,13 @@ function initializeTreeLayout(savedEdges: Edge[] = [], employees?: Employee[]): 
   // 计算所有层级
   const allLevels: string[][] = [];
   const visited = new Set<string>();
+  const allNodeIds = new Set<string>(); // 用于去重
   
   // 顶级节点放第一层
   if (topLevelIds.length > 0) {
-    allLevels.push([...topLevelIds]);
-    topLevelIds.forEach(id => visited.add(id));
+    const uniqueTopLevel = [...new Set(topLevelIds)];
+    allLevels.push(uniqueTopLevel);
+    uniqueTopLevel.forEach(id => visited.add(id));
   }
   
   // 递归获取剩余层级
@@ -117,8 +119,8 @@ function initializeTreeLayout(savedEdges: Edge[] = [], employees?: Employee[]): 
     });
     
     if (children.length > 0) {
-      allLevels.push(children);
-      getRemainingLevels(children, level + 1);
+      allLevels.push([...new Set(children)]); // 去重
+      getRemainingLevels([...new Set(children)], level + 1);
     }
   };
   
@@ -129,6 +131,7 @@ function initializeTreeLayout(savedEdges: Edge[] = [], employees?: Employee[]): 
   
   // 构建节点位置
   const nodes: Node[] = [];
+  const addedNodeIds = new Set<string>(); // 防止重复节点
   
   // 已参与关系的员工 - 树状布局
   allLevels.forEach((levelNodes, levelIndex) => {
@@ -137,7 +140,8 @@ function initializeTreeLayout(savedEdges: Edge[] = [], employees?: Employee[]): 
     
     levelNodes.forEach((nodeId, nodeIndex) => {
       const emp = employeeList.find(e => e.id === nodeId);
-      if (emp) {
+      if (emp && !addedNodeIds.has(emp.id)) {
+        addedNodeIds.add(emp.id);
         nodes.push({
           id: emp.id,
           type: 'employeeNode',
@@ -157,6 +161,8 @@ function initializeTreeLayout(savedEdges: Edge[] = [], employees?: Employee[]): 
   const lowestY = centerY + maxLevel * verticalSpacing + 150;
   
   unrelatedEmployees.forEach((emp, index) => {
+    if (addedNodeIds.has(emp.id)) return; // 避免重复
+    addedNodeIds.add(emp.id);
     const row = Math.floor(index / 4);
     const col = index % 4;
     nodes.push({
@@ -391,19 +397,37 @@ export const useTopologyStore = create<TopologyState>((set, get) => ({
     const currentTeamId = get().currentTeamId;
     
     try {
+      // 先加载员工列表（从API）
+      const employees = await fetchEmployees();
+      
       // 加载团队列表
       const teamsResponse = await fetch('http://localhost:5301/api/teams');
       const teamsResult = await teamsResponse.json();
       if (teamsResult.success) {
         set({ teams: teamsResult.data });
         
-        // 检查 localStorage 是否有保存的团队，或者当前已有团队
+        // 检查 localStorage 是否有保存的团队
         const savedTeamId = currentTeamId || localStorage.getItem('tw-current-team-id');
         if (savedTeamId) {
           const savedTeam = teamsResult.data.find((t: Team) => t.id === savedTeamId);
           if (savedTeam) {
-            // 使用团队成员
-            const teamEmpList = DEFAULT_EMPLOYEES.filter(e => savedTeam.memberIds.includes(e.id));
+            // 使用加载的员工列表过滤团队成员
+            const standardEmployeeIds = new Set(employees.map(e => e.id));
+            const standardMembers = employees.filter(e => savedTeam.memberIds.includes(e.id));
+            // 为不在标准列表中的自定义员工创建占位符
+            const customMembers: Employee[] = savedTeam.memberIds
+              .filter((id: string) => !standardEmployeeIds.has(id))
+              .map((id: string) => ({
+                id,
+                name: `员工${id.slice(-4)}`,
+                type: 'manager' as const,
+                avatar: '/avatars/manager.png',
+                description: '自定义员工',
+                status: 'idle' as const,
+                roleName: '成员',
+                department: '自定义',
+              }));
+            const teamEmpList = [...standardMembers, ...customMembers];
             
             const edges: Edge[] = savedTeam.relationships.map((rel: Relationship, index: number) => ({
               id: `edge-${rel.source}-${rel.target}-${index}`,
@@ -421,17 +445,16 @@ export const useTopologyStore = create<TopologyState>((set, get) => ({
               nodes: newNodes,
               currentTeamId: savedTeam.id 
             });
-            console.log('✅ 已自动加载团队:', savedTeam.name);
+            console.log('✅ 已自动加载团队:', savedTeam.name, '成员:', teamEmpList.map(e => e.name));
             return;
           }
         }
       }
       
-      // 加载员工列表（当没有团队时）
-      const employees = await fetchEmployees();
+      // 如果没有保存的团队，使用加载的员工列表
       set({ employees });
       
-      // 如果没有保存的团队，加载拓扑关系
+      // 加载拓扑关系
       const response = await fetch('http://localhost:5301/api/status');
       const result = await response.json();
       if (result.success && result.data.loaded) {
@@ -445,7 +468,7 @@ export const useTopologyStore = create<TopologyState>((set, get) => ({
         }));
         set({ edges });
         
-        // 根据保存的关系布局（使用最新员工列表）
+        // 根据保存的关系布局
         const newNodes = initializeTreeLayout(edges, employees);
         set({ nodes: newNodes });
         
@@ -479,8 +502,33 @@ export const useTopologyStore = create<TopologyState>((set, get) => ({
 
   // 切换团队
   switchTeam: (team: Team) => {
-    // 始终使用 DEFAULT_EMPLOYEES 来过滤团队成员，确保数据完整
-    const employees = DEFAULT_EMPLOYEES.filter(e => team.memberIds.includes(e.id));
+    // 使用完整员工列表构建团队成员
+    // 标准员工从列表中筛选，自定义员工创建占位符
+    const currentEmployees = get().employees;
+    const standardEmployeeIds = new Set(currentEmployees.length >= 12 
+      ? currentEmployees.map(e => e.id)
+      : DEFAULT_EMPLOYEES.map(e => e.id));
+    
+    // 收集团队中的标准员工
+    const standardMembers = currentEmployees.length >= 12 
+      ? currentEmployees.filter(e => team.memberIds.includes(e.id))
+      : DEFAULT_EMPLOYEES.filter(e => team.memberIds.includes(e.id));
+    
+    // 为不在标准列表中的自定义员工创建占位符
+    const customMembers: Employee[] = team.memberIds
+      .filter((id: string) => !standardEmployeeIds.has(id))
+      .map((id: string) => ({
+        id,
+        name: `员工${id.slice(-4)}`,
+        type: 'manager' as const,
+        avatar: '/avatars/manager.png',
+        description: '自定义员工',
+        status: 'idle' as const,
+        roleName: '成员',
+        department: '自定义',
+      }));
+    
+    const employees = [...standardMembers, ...customMembers];
     console.log('🔍 团队成员:', team.name, '→', employees.map(e => e.name));
     
     // 转换关系为 Edge 格式

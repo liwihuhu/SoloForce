@@ -662,18 +662,22 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
     ctx.textAlign = 'center';
     ctx.fillText(gw.reachable ? 'ONLINE' : 'OFFLINE', W - 100, 96);
     ctx.fillText(gw.latency ? gw.latency + 'ms' : '0ms', W - 100, 114);
-    // 4 KPI cards
-    const cardW = 215, cardH = 160, gap = 20;
+    // 6 KPI cards
+    const sec = d.security || {};
+    const hb = d.heartbeat || {};
+    const cardW = 148, cardH = 130, gap = 14;
     const cards = [
       { label: 'AGENTS', value: ag.count || 0, sub: (ag.sessions || 0) + ' sessions', color: '#F472B6' },
-      { label: 'ACTIVE', value: ts.active || 0, sub: 'queued ' + (ts.queued || 0) + ' | running ' + (ts.running || 0), color: '#60A5FA' },
+      { label: 'GATEWAY', value: gw.latency ? gw.latency + 'ms' : '--', sub: gw.reachable ? 'ONLINE' : 'OFFLINE', color: '#A78BFA' },
+      { label: 'TASKS', value: ts.active || 0, sub: 'q:' + (ts.queued || 0) + ' r:' + (ts.running || 0), color: '#60A5FA' },
       { label: 'MEMORY', value: mem.files || 0, sub: (mem.chunks || 0) + ' chunks', color: '#4ADE80' },
-      { label: 'SESSIONS', value: ss.active || 0, sub: (ts.tracked || 0) + ' tracked', color: '#A78BFA' },
+      { label: 'SECURITY', value: (sec.critical || 0) + (sec.warn || 0), sub: 'c:' + (sec.critical || 0) + ' w:' + (sec.warn || 0), color: (sec.critical || 0) > 0 ? '#EF4444' : '#FBBF24' },
+      { label: 'HEARTBEAT', value: hb.interval || '--', sub: hb.target || '--', color: '#38BDF8' },
     ];
-    const startX = 40;
+    const startX = (W - (cardW * 6 + gap * 5)) / 2;
     cards.forEach((card, i) => {
       const x = startX + i * (cardW + gap);
-      const y = 85;
+      const y = 80;
       ctx.fillStyle = '#0a1828';
       ctx.strokeStyle = card.color;
       ctx.lineWidth = 2;
@@ -682,17 +686,48 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = card.color;
-      ctx.fillRect(x + 4, y + 4, cardW - 8, 5);
+      ctx.fillRect(x + 4, y + 4, cardW - 8, 4);
       ctx.fillStyle = card.color;
-      ctx.font = 'bold 13px "SF Mono", monospace';
+      ctx.font = 'bold 11px "SF Mono", monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(card.label, x + 14, y + 32);
+      ctx.fillText(card.label, x + 10, y + 26);
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 58px "SF Mono", monospace';
-      ctx.fillText(String(card.value), x + 14, y + 112);
+      ctx.font = 'bold 40px "SF Mono", monospace';
+      ctx.fillText(String(card.value), x + 10, y + 90);
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px "SF Mono", monospace';
-      ctx.fillText(card.sub, x + 14, y + 140);
+      ctx.font = '11px "SF Mono", monospace';
+      ctx.fillText(card.sub, x + 10, y + 115);
+    });
+    // Second row: SESSIONS + SKILLS + MCP + VERSION
+    const row2Y = 230;
+    const secCards = [
+      { label: 'SESSIONS', value: ss.active || 0, sub: ss.model || 'MiniMax-M2.7', color: '#38BDF8' },
+      { label: 'SKILLS', value: d.skills ?? 0, sub: 'installed', color: '#FBBF24' },
+      { label: 'MCP', value: d.mcp ?? 0, sub: 'extensions', color: '#FB923C' },
+      { label: 'VERSION', value: d.version || '--', sub: d.channel || 'stable', color: '#E879F9' },
+    ];
+    const row2StartX = (W - (cardW * 4 + gap * 3)) / 2;
+    secCards.forEach((card, i) => {
+      const x = row2StartX + i * (cardW + gap);
+      ctx.fillStyle = '#0a1828';
+      ctx.strokeStyle = card.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(x, row2Y, cardW, cardH, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = card.color;
+      ctx.fillRect(x + 4, row2Y + 4, cardW - 8, 4);
+      ctx.fillStyle = card.color;
+      ctx.font = 'bold 11px "SF Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(card.label, x + 10, row2Y + 26);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 36px "SF Mono", monospace';
+      ctx.fillText(String(card.value), x + 10, row2Y + 88);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '11px "SF Mono", monospace';
+      ctx.fillText(card.sub, x + 10, row2Y + 113);
     });
     // System bar
     ctx.fillStyle = '#22C55E';
@@ -700,9 +735,10 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
     ctx.fillStyle = '#000';
     ctx.font = 'bold 15px "SF Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('ALL SYSTEMS OPERATIONAL  |  5s REFRESH', W / 2, H - 16);
+    ctx.fillText('OPENCLAW SYSTEM  |  5s REFRESH  |  ' + (d.tailscale === 'on' ? 'TS:ON' : 'TS:OFF'), W / 2, H - 16);
     texture.needsUpdate = true;
   }, [ocStatus]);
+
 
   return (
     <mesh ref={meshRef}>
@@ -714,146 +750,78 @@ function CoreStatsScreen({ width, height, color, ocStatus }: { width: number; he
 
 // ===========================================
 // 6F OpenClaw机房 - 单个终端数据屏幕
-function TerminalScreen({ width, height, color, data, statusColor, variant }: { width: number; height: number; color: string; data: any; statusColor: string; variant?: string }) {
+function TerminalScreen({ width, height, color, data, statusColor }: { width: number; height: number; color: string; data: any; statusColor: string }) {
   const meshRef = useRef<THREE.Mesh>(null!);
-  const canvas = useMemo(() => { const c = document.createElement('canvas'); c.width = 512; c.height = 512; return c; }, []);
+  const canvas = useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 256;
+    return c;
+  }, []);
   const texture = useMemo(() => new THREE.CanvasTexture(canvas), [canvas]);
 
+  // 数据变化时绘制
   useEffect(() => {
-    const ctx = canvas.getContext('2d')!;
-    const W = 512, H = 512;
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#000c1a';
-    ctx.fillRect(0, 0, W, H);
-    if (!data) {
-      ctx.fillStyle = '#374151';
-      ctx.font = 'bold 24px "SF Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('CONNECTING...', W / 2, H / 2);
-      texture.needsUpdate = true;
-      return;
-    }
-    // Top bar
-    ctx.fillStyle = statusColor;
-    ctx.fillRect(0, 0, W, 14);
-    // Status badge
-    ctx.fillStyle = statusColor;
-    ctx.beginPath();
-    ctx.roundRect(W - 140, 24, 126, 36, 4);
-    ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 14px "SF Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(data.status || 'OFFLINE', W - 77, 48);
-    // BIG number
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 160px "SF Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(data.value1 || 0), W / 2, 280);
-    // Unit
-    ctx.fillStyle = color;
-    ctx.font = 'bold 24px "SF Mono", monospace';
-    ctx.fillText(data.unit || '', W / 2, 330);
-    // Progress bar
-    const ratio = data.value2 ? Math.min(data.value1 / data.value2, 1) : 1.0;
-    ctx.fillStyle = '#1e3a5f';
-    ctx.beginPath();
-    ctx.roundRect(30, 370, W - 60, 24, 6);
-    ctx.fill();
-    ctx.fillStyle = statusColor;
-    ctx.beginPath();
-    ctx.roundRect(30, 370, (W - 60) * ratio, 24, 6);
-    ctx.fill();
-    // Secondary
-    if (data.value2 !== undefined) {
-      ctx.fillStyle = color;
-      ctx.font = 'bold 36px "SF Mono", monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(String(data.value2), 30, 450);
-      ctx.fillStyle = '#64748b';
-      ctx.font = '20px "SF Mono", monospace';
-      ctx.fillText('/ ' + (data.value3 !== undefined ? data.value3 : 0) + ' total', 30 + String(data.value2).length * 28, 450);
-    }
-    texture.needsUpdate = true;
-  }, [data, statusColor]);
-    // Special ME mode - show AI assistant info
-    if (variant === 'me' && data) {
-      const ctx = canvas.getContext('2d')!;
-      const W = 512, H = 512;
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#0a0020';
-      ctx.fillRect(0, 0, W, H);
-      // Purple gradient top
-      const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, '#4a0080');
-      grad.addColorStop(1, '#0a0020');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, W, H);
-      // Top bar
-      ctx.fillStyle = '#E879F9';
-      ctx.fillRect(0, 0, W, 16);
-      // Status badge
-      ctx.fillStyle = '#22C55E';
-      ctx.beginPath();
-      ctx.roundRect(W - 130, 24, 115, 32, 6);
-      ctx.fill();
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 13px "SF Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('● ONLINE', W - 72, 46);
-      // Avatar circle
-      ctx.fillStyle = '#E879F9';
-      ctx.beginPath();
-      ctx.arc(W/2, 100, 44, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 28px "SF Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('AI', W/2, 112);
-      // Name
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 22px "SF Mono", monospace';
-      ctx.fillText('Hlw\'s OpenClaw', W/2, 175);
-      ctx.fillStyle = '#E879F9';
-      ctx.font = 'bold 16px "SF Mono", monospace';
-      ctx.fillText('Bot', W/2, 198);
-      // Divider
-      ctx.fillStyle = '#E879F9';
-      ctx.fillRect(40, 220, W - 80, 2);
-      // Info rows
-      const rows = [
-        { label: 'MODEL', value: 'MiniMax-M2.7' },
-        { label: 'SESSIONS', value: String(data.value2 || 2) },
-        { label: 'MEMORY', value: String(data.value3 || 65) + ' files' },
-        { label: 'SKILLS', value: '12+ active' },
-      ];
-      rows.forEach((row, i) => {
-        const y = 260 + i * 55;
-        ctx.fillStyle = '#E879F9';
-        ctx.font = 'bold 11px "SF Mono", monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(row.label, 40, y);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 24px "SF Mono", monospace';
-        ctx.fillText(row.value, 40, y + 26);
-      });
-      // Bottom glow bar
-      ctx.fillStyle = '#E879F9';
-      ctx.fillRect(0, H - 30, W, 30);
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 12px "SF Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('🦠 OPENCLAW AI ASSISTANT 🦠', W/2, H - 10);
-      texture.needsUpdate = true;
-      return;
-    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const W = 512, H = 256;
 
+    // 背景
+    ctx.fillStyle = '#050f1e';
+    ctx.fillRect(0, 0, W, H);
+
+    const status = data?.status ?? 'OFFLINE';
+    const bigNum = data ? String(data.value1) : '--';
+    const unit = data?.unit ?? '';
+    const value2 = data?.value2;
+    const value3 = data?.value3;
+    const ratio = (value2 != null && value2 > 0 && value3 > 0)
+      ? Math.min(value2 / value3, 1) : 0.6;
+
+    // 顶部色带
+    ctx.fillStyle = statusColor;
+    ctx.fillRect(0, 0, W, 32);
+
+    // 状态文字
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 15px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(status, W / 2, 22);
+
+    // 主数字
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 100px monospace';
+    ctx.fillText(bigNum, W / 2, H / 2 + 28);
+
+    // 单位
+    ctx.fillStyle = color;
+    ctx.font = 'bold 26px monospace';
+    ctx.fillText(unit, W / 2, H - 26);
+
+    // 进度条底
+    const bW = W * 0.82, bH = 14, bX = W * 0.09, bY = H - 52;
+    ctx.fillStyle = '#0d2040';
+    ctx.fillRect(bX, bY, bW, bH);
+
+    // 进度条填充
+    ctx.fillStyle = statusColor;
+    ctx.fillRect(bX, bY, bW * ratio, bH);
+
+    texture.needsUpdate = true;
+  }, [data, statusColor, color]);
 
   return (
-    <mesh ref={meshRef}>
-      <planeGeometry args={[width, height]} />
-      <meshBasicMaterial map={texture} />
-    </mesh>
+    <group>
+      {/* fallback 有色背景 */}
+      <mesh position={[0, 0, 0.034]}>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+      </mesh>
+      {/* canvas 纹理屏幕 */}
+      <mesh ref={meshRef} position={[0, 0, 0.036]}>
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial map={texture} transparent />
+      </mesh>
+    </group>
   );
 }
 
@@ -1858,72 +1826,27 @@ function SoftTube({ x, z, color }: { x: number; z: number; color: string }) {
 // ── 核心至终端的曲线管道光效 ─────────────────────────────────────────────
 // 每条管道：贝塞尔曲线 + CanvasTexture 流动脉冲
 
-function CurvedTube({ nx, nz, color, index, total }: { nx: number; nz: number; color: string; index: number; total: number }) {
-  const meshRef = useRef<THREE.Mesh>(null!);
-  const elapsed = useRef(0);
-
-  // 核心[0,2.2,0] → 弧形弯管(向下凹陷+XY平面弯曲) → 终端[nx,1.2,nz]
-  // 控制点：中间点下压 + 横向偏置，在XY平面内也产生弯曲
+// 简单管道（无动画，无 useFrame，不会导致 Context Lost）
+function CurvedTube({ nx, nz, color }: { nx: number; nz: number; color: string }) {
   const r = Math.sqrt(nx * nx + nz * nz);
-  const perpX = r > 0.01 ? -nz / r : 0.5;  // 垂直于径向的横向单位向量
+  const perpX = r > 0.01 ? -nz / r : 0.5;
   const perpZ = r > 0.01 ? nx / r : 0;
-  const midX = nx * 0.5 + perpX * 0.6;  // 加入横向弯曲
-  const midY = 0.4;  // 下垂
+  const midX = nx * 0.5 + perpX * 0.6;
+  const midY = 0.4;
   const midZ = nz * 0.5 + perpZ * 0.6;
-
   const curve = useMemo(() => new THREE.CatmullRomCurve3([
     new THREE.Vector3(0, 2.2, 0),
     new THREE.Vector3(midX, midY, midZ),
     new THREE.Vector3(nx, 1.2, nz),
   ]), [nx, nz, midX, midY, midZ]);
 
-  // 流动纹理：沿U方向滚动的高光条纹
-  const texture = useMemo(() => {
-    const W = 128, H = 64;
-    const cv = document.createElement('canvas') as HTMLCanvasElement;
-    cv.width = W; cv.height = H;
-    const ctx = cv.getContext('2d')!;
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0a0e1a';
-    ctx.fillRect(0, 0, W, H);
-    // 管道本色底
-    ctx.fillStyle = color + '88';
-    ctx.fillRect(0, H / 2 - 10, W, 20);
-    // 初始：中心一道亮光
-    const grd = ctx.createLinearGradient(0, 0, W, 0);
-    grd.addColorStop(0, 'transparent');
-    grd.addColorStop(0.5, color + 'ff');
-    grd.addColorStop(1, 'transparent');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, H / 2 - 10, W, 20);
-    const tex = new THREE.CanvasTexture(cv);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.needsUpdate = true;
-    return tex;
-  }, [color]);
-
-  useFrame((_, delta) => {
-    elapsed.current += delta;
-    const speed = 0.35;
-    texture.offset.x = (elapsed.current * speed + index / total) % 1;
-    texture.needsUpdate = true;
-    if (meshRef.current) {
-      const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-      mat.map = texture;
-      mat.needsUpdate = true;
-    }
-  });
-
   return (
-    <mesh ref={meshRef}>
+    <mesh>
       <tubeGeometry args={[curve, 32, 0.06, 8, false]} />
       <meshStandardMaterial
-        color={'#ffffff66'}
-        emissive={'#ffffff'}
-        emissiveIntensity={0.5}
-        map={texture}
-        transparent
-        opacity={0.9}
+        color={color}
+        emissive={color}
+        emissiveIntensity={0.8}
         roughness={0.2}
         metalness={0.8}
       />
@@ -1946,8 +1869,6 @@ function CoreTubes({ terminalNodes, RING_RADIUS }: {
             nx={nx}
             nz={nz}
             color={color}
-            index={i}
-            total={terminalNodes.length}
           />
         );
       })}
@@ -2250,39 +2171,35 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
     // ================================================================
 
     const [ocStatus, setOcStatus] = useState<any>(null);
+    const [coreInfo, setCoreInfo] = useState({ agents: 0, sessions: 0, version: '' });
 
     useEffect(() => {
       if (floorId !== '6f') return;
       let cancelled = false;
       const fetchStatus = async () => {
         try {
-          const res = await fetch('http://localhost:18789/v1/responses', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer a9b2a391cf24f37e397718bfdae0ff2302a1133f0fe2b3f2',
-            },
-            body: JSON.stringify({
-              model: 'openclaw',
-              input: '返回JSON格式的OpenClaw系统状态，不要任何其他文字，只返回纯JSON：{agents_count,sessions_active,tasks_active,memory_files,mcp_tools_count,skills_count,gateway_latency_ms,uptime_seconds}。如果无法获取则返回null。',
-            }),
-          }).then(r => r.json()).catch(() => null);
-          if (!cancelled && res?.output?.[0]?.content?.[0]?.text) {
-            const text = res.output[0].content[0].text;
-            try {
-              const json = JSON.parse(text.replace(/^[^{]*/,'').replace(/[^}]*$/,''));
-              setOcStatus({
-                agents: { count: json.agents_count ?? 1, sessions: json.sessions_active ?? 1 },
-                sessions: { active: json.sessions_active ?? 1 },
-                tasks: { active: json.tasks_active ?? 0, running: 0, tracked: 0 },
-                memory: { files: json.memory_files ?? 0, chunks: 0 },
-                gateway: { latency: json.gateway_latency_ms ?? 0, reachable: true },
-                skills: { count: json.skills_count ?? 0 },
-                mcp: { count: json.mcp_tools_count ?? 0 },
-                uptime: json.uptime_seconds ?? 0,
-              });
-            } catch (_) {}
-          }
+          const res = await fetch('http://localhost:5301/api/openclaw-status').then(r => r.json()).catch(() => null);
+          if (cancelled || !res?.success || !res?.data) return;
+          const d = res.data;
+          setOcStatus({
+            agents:    { count: d.agents?.count ?? 1, sessions: d.agents?.sessions ?? 1 },
+            sessions:  { active: d.sessions?.active ?? 1, model: d.sessions?.model ?? '' },
+            tasks:     { active: d.tasks?.active ?? 0, running: d.tasks?.running ?? 0, queued: d.tasks?.queued ?? 0, tracked: d.tasks?.tracked ?? 0, issues: d.tasks?.issues ?? 0 },
+            memory:    { files: d.memory?.files ?? 0, chunks: d.memory?.chunks ?? 0, cache: d.memory?.cache ?? null },
+            gateway:   { latency: d.gateway?.latency ?? 0, reachable: d.gateway?.reachable ?? false },
+            security:  { critical: d.security?.critical ?? 0, warn: d.security?.warn ?? 0, info: d.security?.info ?? 0 },
+            heartbeat: { interval: d.heartbeat?.interval ?? '', target: d.heartbeat?.target ?? '' },
+            skills:    d.skills ?? 0,
+            mcp:       d.mcp ?? 0,
+            tailscale: d.tailscale ?? 'off',
+            channel:   d.channel ?? '',
+            version:   d.version ?? '',
+          });
+          setCoreInfo({
+            agents: d.agents?.count ?? 0,
+            sessions: d.sessions?.active ?? 0,
+            version: d.version ?? '',
+          });
         } catch (_) {}
       };
       fetchStatus();
@@ -2291,24 +2208,25 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
     }, [floorId]);
 
     const terminalData = useMemo(() => {
-      if (!ocStatus) return null;
       const d = ocStatus;
+      const sec = d?.security;
+      const secTotal = (sec?.critical ?? 0) + (sec?.warn ?? 0) + (sec?.info ?? 0);
       return {
-        ME:      { value1: 1, value2: d.sessions?.active ?? 2, value3: d.memory?.files ?? 65, status: 'ONLINE',  unit: 'sessions' },
-        AGENTS:  { value1: d.agents?.count ?? 1, value2: d.agents?.sessions ?? 2, status: 'ONLINE',  unit: 'agents' },
-        GATEWAY: { value1: d.gateway?.latency ?? 0, status: d.gateway?.reachable ? 'CONNECTED' : 'OFFLINE', unit: 'ms' },
-        TASKS:   { value1: d.tasks?.active ?? 0, value2: d.tasks?.running ?? 0, value3: d.tasks?.tracked ?? 8, status: d.tasks?.active > 0 ? 'ACTIVE' : 'IDLE', unit: 'tasks' },
-        MEMORY:  { value1: d.memory?.files ?? 65, value2: d.memory?.chunks ?? 366, status: 'ACTIVE',  unit: 'files' },
-        SESSIONS:{ value1: d.sessions?.active ?? 2, status: 'LIVE',  unit: 'sessions' },
-        SKILLS:  { value1: 12, value2: 8, status: 'LOADED', unit: 'skills' },
-        MCP:     { value1: 4, value2: 12, status: 'READY',  unit: 'tools' },
+        ME:       { value1: d?.sessions?.active ?? 0, value2: d?.memory?.files ?? 0, value3: d?.memory?.chunks ?? 0, status: 'ONLINE',  unit: 'sessions' },
+        AGENTS:   { value1: d?.agents?.count ?? 0,    value2: d?.agents?.sessions ?? 0, status: 'ONLINE',  unit: 'agents' },
+        GATEWAY:  { value1: d?.gateway?.latency ?? 0, status: d?.gateway?.reachable ? 'CONNECTED' : 'OFFLINE', unit: 'ms' },
+        TASKS:    { value1: d?.tasks?.active ?? 0,   value2: d?.tasks?.running ?? 0,    value3: d?.tasks?.tracked ?? 0, status: d?.tasks?.active > 0 ? 'ACTIVE' : 'IDLE', unit: 'tasks' },
+        MEMORY:   { value1: d?.memory?.files ?? 0,   value2: d?.memory?.chunks ?? 0,   status: 'ACTIVE',  unit: 'files' },
+        SESSIONS: { value1: d?.sessions?.active ?? 0, status: 'LIVE',  unit: 'sessions' },
+        SECURITY: { value1: secTotal, value2: sec?.critical ?? 0, value3: sec?.warn ?? 0, status: (sec?.critical ?? 0) > 0 ? 'ALERT' : (sec?.warn ?? 0) > 0 ? 'WARN' : 'OK', unit: 'issues' },
+        HEARTBEAT:{ value1: 1, value2: 0, status: d?.heartbeat?.interval ? 'ACTIVE' : 'OFF', unit: d?.heartbeat?.interval || '--' },
       };
     }, [ocStatus]);
 
     const statusColorMap: Record<string, string> = {
       ONLINE: '#22C55E', OFFLINE: '#EF4444', CONNECTED: '#22C55E',
       IDLE: '#FBBF24', ACTIVE: '#60A5FA', LIVE: '#22C55E',
-      LOADED: '#22C55E', READY: '#22C55E',
+      OK: '#22C55E', WARN: '#FBBF24', ALERT: '#EF4444',
     };
 
     // 核心引用 (呼吸 + 旋转动画)
@@ -2343,15 +2261,15 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
       });
     });
 
-    const terminalNodes: Array<{ angle: number; color: string; label: string; key: 'ME' | 'AGENTS' | 'GATEWAY' | 'TASKS' | 'MEMORY' | 'SESSIONS' | 'SKILLS' | 'MCP'; isMe: boolean }> = [
-      { angle: 0,          color: '#E879F9', label: 'ME',       key: 'ME',      isMe: true },
-      { angle: Math.PI / 4,       color: '#F472B6', label: 'AGENTS',   key: 'AGENTS',  isMe: false },
-      { angle: Math.PI / 2,       color: '#A78BFA', label: 'GATEWAY',  key: 'GATEWAY',  isMe: false },
-      { angle: Math.PI * 3 / 4,   color: '#60A5FA', label: 'TASKS',    key: 'TASKS',    isMe: false },
-      { angle: Math.PI,           color: '#4ADE80', label: 'MEMORY',   key: 'MEMORY',   isMe: false },
-      { angle: Math.PI * 5 / 4,   color: '#38BDF8', label: 'SESSIONS', key: 'SESSIONS', isMe: false },
-      { angle: Math.PI * 3 / 2,   color: '#FBBF24', label: 'SKILLS',   key: 'SKILLS',   isMe: false },
-      { angle: Math.PI * 7 / 4,   color: '#FB923C', label: 'MCP',      key: 'MCP',      isMe: false },
+    const terminalNodes: Array<{ angle: number; color: string; label: string; key: 'ME' | 'AGENTS' | 'GATEWAY' | 'TASKS' | 'MEMORY' | 'SESSIONS' | 'SECURITY' | 'HEARTBEAT'; isMe: boolean }> = [
+      { angle: 0,            color: '#E879F9', label: 'ME',        key: 'ME',        isMe: true },
+      { angle: Math.PI / 4,         color: '#F472B6', label: 'AGENTS',    key: 'AGENTS',    isMe: false },
+      { angle: Math.PI / 2,         color: '#A78BFA', label: 'GATEWAY',   key: 'GATEWAY',   isMe: false },
+      { angle: Math.PI * 3 / 4,     color: '#60A5FA', label: 'TASKS',     key: 'TASKS',     isMe: false },
+      { angle: Math.PI,             color: '#4ADE80', label: 'MEMORY',    key: 'MEMORY',    isMe: false },
+      { angle: Math.PI * 5 / 4,     color: '#38BDF8', label: 'SESSIONS',  key: 'SESSIONS',  isMe: false },
+      { angle: Math.PI * 3 / 2,     color: '#FBBF24', label: 'SECURITY',  key: 'SECURITY',  isMe: false },
+      { angle: Math.PI * 7 / 4,     color: '#FB923C', label: 'HEARTBEAT', key: 'HEARTBEAT', isMe: false },
     ];
     const RING_RADIUS = 4.8;
 
@@ -2447,28 +2365,28 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
           {/* AGENTS 面（朝右偏后） */}
           <group position={[0, 1.6, 0]} rotation={[0, Math.PI * 3 / 4, 0]}>
             <mesh>
-              <boxGeometry args={[1.5, 0.9, 0.04]} />
+              <boxGeometry args={[2.0, 0.9, 0.04]} />
               <meshStandardMaterial color="#000408" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.25} />
             </mesh>
             <mesh position={[0, 0, 0.025]}>
-              <planeGeometry args={[1.56, 0.96]} />
+              <planeGeometry args={[2.06, 0.96]} />
               <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} />
             </mesh>
-            <Text position={[0, 0.08, 0.026]} fontSize={0.18} color={config.glowColor} fontWeight={700} anchorX="center" anchorY="middle">AGENTS: 8</Text>
-            <Text position={[0, -0.16, 0.026]} fontSize={0.11} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>SESSIONS: 3</Text>
+            <Text position={[0, 0.08, 0.026]} fontSize={0.14} color="#000000" fontWeight={700} anchorX="center" anchorY="middle">AGENTS: {coreInfo.agents}</Text>
+            <Text position={[0, -0.18, 0.026]} fontSize={0.09} color="#000000" anchorX="center" anchorY="middle" fillOpacity={0.7}>SESSIONS: {coreInfo.sessions}</Text>
           </group>
           {/* OPENCLAW 面（朝左偏前，与AGENTS背对背） */}
           <group position={[0, 1.6, 0]} rotation={[0, -Math.PI / 4, 0]}>
             <mesh>
-              <boxGeometry args={[1.5, 0.9, 0.04]} />
+              <boxGeometry args={[2.0, 0.9, 0.04]} />
               <meshStandardMaterial color="#000408" roughness={0.05} metalness={0.5} emissive={config.glowColor} emissiveIntensity={0.25} />
             </mesh>
             <mesh position={[0, 0, 0.025]}>
-              <planeGeometry args={[1.56, 0.96]} />
+              <planeGeometry args={[2.06, 0.96]} />
               <meshStandardMaterial color={config.glowColor} emissive={config.glowColor} emissiveIntensity={2.5} />
             </mesh>
-            <Text position={[0, 0.08, 0.026]} fontSize={0.18} color={config.glowColor} fontWeight={700} anchorX="center" anchorY="middle">OPENCLAW</Text>
-            <Text position={[0, -0.16, 0.026]} fontSize={0.11} color={config.glowColor} anchorX="center" anchorY="middle" fillOpacity={0.7}>NEURAL ENGINE v2.0</Text>
+            <Text position={[0, 0.08, 0.026]} fontSize={0.13} color="#000000" fontWeight={700} anchorX="center" anchorY="middle">OPENCLAW {coreInfo.version}</Text>
+            <Text position={[0, -0.18, 0.026]} fontSize={0.09} color="#000000" anchorX="center" anchorY="middle" fillOpacity={0.7}>NEURAL ENGINE</Text>
           </group>
 
         </group>
@@ -2515,38 +2433,29 @@ function Floor3DScene({ floorId, floorIndex }: { floorId: string; floorIndex: nu
           );
         })}
 
-        {/* ===== 终端外侧屏幕阵列 — 8块屏幕环绕核心 ===== */}
-        {terminalNodes.map(({ angle, color, key, label }, i) => {
+        {/* ===== 终端外侧屏幕阵列 — 8块屏幕 ===== */}
+        {terminalNodes.map(({ angle, color, key, label, isMe }, i) => {
           const sx = Math.sin(angle) * (RING_RADIUS + 1.0);
           const sz = Math.cos(angle) * (RING_RADIUS + 1.0);
           const data = terminalData?.[key];
           const sc = statusColorMap[data?.status || 'OFFLINE'] || '#EF4444';
           return (
             <group key={key} position={[sx, 1.5, sz]} rotation={[0, angle, 0]}>
-              {/* 屏幕主体 */}
-              <mesh position={[0, 0, 0]}>
-                <boxGeometry args={[1.4, 0.85, 0.05]} />
-                <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={color} emissiveIntensity={0.08} />
+              {/* 屏幕底板 */}
+              <mesh>
+                <boxGeometry args={[1.5, 0.95, 0.06]} />
+                <meshStandardMaterial color="#020a14" roughness={0.05} metalness={0.5} emissive={color} emissiveIntensity={0.12} />
               </mesh>
-              {/* 四边框发光 */}
-              <mesh position={[0, 0, 0.028]}>
-                <boxGeometry args={[1.45, 0.9, 0.01]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} transparent opacity={0.5} />
-              </mesh>
-              {/* 状态条 */}
-              <mesh position={[0, 0.36, 0.035]}>
-                <planeGeometry args={[1.2, 0.06]} />
-                <meshStandardMaterial color={sc} emissive={sc} emissiveIntensity={2.5} />
-              </mesh>
-              {/* 数据文字 */}
-              <Text position={[0, 0.06, 0.036]} fontSize={0.22} color={color} anchorX="center" anchorY="middle">
-                {data ? String(data.value1) : '--'}
-              </Text>
-              <Text position={[0, -0.22, 0.036]} fontSize={0.12} color={color} anchorX="center" anchorY="middle" fillOpacity={0.7}>
-                {data?.unit || ''}
-              </Text>
-              {/* 终端名字 — 贴在屏幕下方 */}
-              <Text position={[0, -0.62, 0.036]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
+              {/* TerminalScreen Canvas 内容（直接放在底板上方） */}
+              <TerminalScreen
+                width={1.36}
+                height={0.76}
+                color={color}
+                data={data}
+                statusColor={sc}
+              />
+              {/* 终端名字 */}
+              <Text position={[0, -0.62, 0.06]} fontSize={0.18} color={color} anchorX="center" anchorY="middle">
                 {label}
               </Text>
             </group>

@@ -5,6 +5,8 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, execFileSync, spawn } from 'child_process';
+import { Router } from 'express';
+import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,10 +14,39 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 5301;
 
-// 硅基流动API配置
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '请在 .env 文件中配置 OPENAI_API_KEY';
-const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.siliconflow.cn/v1';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'qwen2.5-7b-instruct';
+// OpenClaw API 配置（统一 AI 调用）
+const OPENCLAW_URL = process.env.OPENCLAW_URL || 'http://127.0.0.1:18789';
+const OPENCLAW_API_TOKEN = process.env.OPENCLAW_API_TOKEN || 'a9b2a391cf24f37e397718bfdae0ff2302a1133f0fe2b3f2';
+
+// SiliconFlow LLM 配置
+const SILICONFLOW_BASE_URL = 'https://api.siliconflow.cn/v1';
+const SILICONFLOW_API_KEY = process.env.SILICONFLOW_API_KEY || '';
+const SILICONFLOW_MODEL = process.env.SILICONFLOW_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
+
+console.log('[配置] OpenClaw URL:', OPENCLAW_URL);
+console.log('[配置] OpenClaw Token:', OPENCLAW_API_TOKEN ? `${OPENCLAW_API_TOKEN.slice(0, 10)}...` : '未配置');
+console.log('[配置] SiliconFlow API Key:', SILICONFLOW_API_KEY ? `${SILICONFLOW_API_KEY.slice(0, 10)}...` : '未配置');
+
+// 修复格式错误的 JSON 字符串
+function fixMalformedJSON(jsonStr: string): string {
+  // 1. 修复属性名没有引号的情况
+  let fixed = jsonStr.replace(/([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+  
+  // 2. 修复属性值没有引号的情况（如果是字符串）
+  // 只修复跟在 ": " 后面的未加引号的字符串值
+  fixed = fixed.replace(/"\s*:\s*([a-zA-Z_{}[\]][^",\n}]*?)(\s*[,}])/g, (match, value, ending) => {
+    // 如果值包含特殊字符或看起来像对象/数组，就不加了
+    if (value.startsWith('{') || value.startsWith('[') || value === 'null' || value === 'true' || value === 'false') {
+      return match;
+    }
+    return `"${value}"${ending}`;
+  });
+  
+  // 3. 移除尾部逗号
+  fixed = fixed.replace(/,\s*([}\]])/g, '$1');
+  
+  return fixed;
+}
 
 // 员工类型
 type EmployeeType = 
@@ -323,6 +354,272 @@ loadSavedRelationships();
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// ========== 协商会议路由 ==========
+// 动态导入协商服务（需要 Node.js 原生模块支持）
+async function loadNegotiationRouter() {
+  try {
+    // 协商引擎和服务
+    const { createNegotiationEngine } = await import('./backend/src/services/negotiation/index.js');
+    
+    // 存储活跃的协商引擎实例
+    const activeEngines = new Map<string, any>();
+    
+    // 创建协商会话
+    app.post('/api/negotiation/create', async (req, res) => {
+      try {
+        const { meetingId, topic, participants, maxRounds = 99, aiMode = 'openclaw' } = req.body;
+        const finalMeetingId = meetingId || `meeting-${Date.now()}`;
+
+        if (!topic || !participants || participants.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: { code: 'INVALID_REQUEST', message: '缺少必要参数' }
+          });
+        }
+
+        // 根据 aiMode 选择适配器配置
+        const llmConfig = aiMode === 'llm' 
+          ? {
+              // 优先使用前端传递的配置，否则使用默认/环境变量
+              baseUrl: req.body.llmConfig?.baseUrl || SILICONFLOW_BASE_URL,
+              apiKey: req.body.llmConfig?.apiKey || SILICONFLOW_API_KEY,
+              model: req.body.llmConfig?.model || SILICONFLOW_MODEL,
+            }
+          : undefined;
+
+        const openClawConfig = aiMode === 'openclaw'
+          ? {
+              baseUrl: OPENCLAW_URL,
+              apiToken: OPENCLAW_API_TOKEN,
+              defaultAgentId: 'main',
+            }
+          : undefined;
+
+        const engine = createNegotiationEngine({
+          meetingId: finalMeetingId,
+          topic,
+          participants,
+          maxRounds,
+          userAsArbitrator: true,
+          llm: llmConfig,
+          openClaw: openClawConfig,
+          callbacks: {
+            onMessage: (message) => {
+              console.log(`[协商-${aiMode}] ${message.senderName}: ${message.content?.slice(0, 50) || ''}...`);
+            },
+          },
+        });
+
+        activeEngines.set(finalMeetingId, engine);
+
+        res.json({
+          success: true,
+          data: { meetingId: finalMeetingId, status: 'created', participants: participants.length }
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: { code: 'CREATE_FAILED', message: error instanceof Error ? error.message : '创建失败' }
+        });
+      }
+    });
+
+    // 开始协商
+    app.post('/api/negotiation/:meetingId/start', async (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: '协商会话不存在' }
+          });
+        }
+
+        engine.start().catch(console.error);
+
+        res.json({ success: true, data: { meetingId, status: 'started' } });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: { code: 'START_FAILED', message: error instanceof Error ? error.message : '启动失败' }
+        });
+      }
+    });
+
+    // 用户发言
+    app.post('/api/negotiation/:meetingId/speak', (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const { content, mentionedIds } = req.body;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: '协商会话不存在' }
+          });
+        }
+
+        if (!content) {
+          return res.status(400).json({
+            success: false,
+            error: { code: 'INVALID_REQUEST', message: '内容不能为空' }
+          });
+        }
+
+        engine.userSpeak(content, mentionedIds);
+
+        res.json({ success: true, data: { meetingId, message: '已添加到黑板' } });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: { code: 'SPEAK_FAILED', message: error instanceof Error ? error.message : '发言失败' }
+        });
+      }
+    });
+
+    // 获取协商状态
+    app.get('/api/negotiation/:meetingId/status', (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: '协商会话不存在' }
+          });
+        }
+
+        const state = engine.getState();
+
+        res.json({ success: true, data: state });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: { code: 'GET_STATUS_FAILED', message: error instanceof Error ? error.message : '获取状态失败' }
+        });
+      }
+    });
+
+    // 暂停协商
+    app.post('/api/negotiation/:meetingId/pause', (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: '协商会话不存在' } });
+        }
+
+        engine.pause();
+        res.json({ success: true, data: { meetingId, status: 'paused' } });
+      } catch (error) {
+        res.status(500).json({ success: false, error: { code: 'PAUSE_FAILED', message: error instanceof Error ? error.message : '暂停失败' } });
+      }
+    });
+
+    // 继续协商
+    app.post('/api/negotiation/:meetingId/resume', (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: '协商会话不存在' } });
+        }
+
+        engine.resume();
+        res.json({ success: true, data: { meetingId, status: 'resumed' } });
+      } catch (error) {
+        res.status(500).json({ success: false, error: { code: 'RESUME_FAILED', message: error instanceof Error ? error.message : '继续失败' } });
+      }
+    });
+
+    // 推进下一轮
+    app.post('/api/negotiation/:meetingId/next-round', (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: '协商会话不存在' } });
+        }
+
+        engine.advanceToNextRound();
+        res.json({ success: true, data: { meetingId, status: 'next_round_started' } });
+      } catch (error) {
+        res.status(500).json({ success: false, error: { code: 'NEXT_ROUND_FAILED', message: error instanceof Error ? error.message : '推进失败' } });
+      }
+    });
+
+    // 结束协商（自动生成会议总结）
+    app.post('/api/negotiation/:meetingId/stop', async (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: '协商会话不存在' } });
+        }
+
+        // 获取最终状态（在删除引擎之前）
+        const finalState = engine.getState();
+
+        // 异步停止（会触发自动总结）
+        await engine.stop();
+        
+        // 不立即删除引擎，保持状态以便后续查询
+        // 延迟删除，确保前端能获取到最终状态
+        setTimeout(() => {
+          activeEngines.delete(meetingId);
+        }, 30000); // 30秒后删除
+
+        res.json({
+          success: true,
+          data: { 
+            meetingId, 
+            status: finalState.status, 
+            state: finalState 
+          }
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: { code: 'STOP_FAILED', message: error instanceof Error ? error.message : '停止失败' } });
+      }
+    });
+
+    // 手动触发会议总结
+    app.post('/api/negotiation/:meetingId/summarize', async (req, res) => {
+      try {
+        const { meetingId } = req.params;
+        const engine = activeEngines.get(meetingId);
+
+        if (!engine) {
+          return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: '协商会话不存在' } });
+        }
+
+        const summary = await engine.summarize();
+
+        res.json({
+          success: true,
+          data: { meetingId, summary }
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: { code: 'SUMMARIZE_FAILED', message: error instanceof Error ? error.message : '总结生成失败' } });
+      }
+    });
+
+    console.log('✅ 协商会议路由已加载');
+  } catch (error) {
+    console.error('❌ 协商路由加载失败:', error);
+  }
+}
+
+// 延迟加载协商路由（等待模块解析）
+setTimeout(loadNegotiationRouter, 1000);
 
 // ========== OpenClaw 系统状态 API (带缓存) ==========
 let ocStatusCache: { data: any; ts: number } = { data: null, ts: 0 };
@@ -1042,52 +1339,107 @@ app.get('/api/files', (req, res) => {
   }
 });
 
-// 调用大模型
-async function callLLM(messages: { role: string; content: string }[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    import('node:https').then(({ default: https }) => {
-      const body = Buffer.from(JSON.stringify({
-        model: OPENAI_MODEL,
-        messages,
-        temperature: 0.7,
-        max_tokens: 2048
-      }), 'utf8');
+// 调用大模型（支持 OpenClaw 和 LLM 双模式）
+// 调用 OpenClaw API（用于团队拓扑任务分发）
+async function callLLM(messages: { role: string; content: string }[], aiMode: 'openclaw' | 'llm' = 'openclaw'): Promise<string> {
+  try {
+    // 分离 system 和 user 消息
+    const systemMessages = messages.filter(m => m.role === 'system');
+    const userMessages = messages.filter(m => m.role !== 'system');
+    
+    // 构建 input
+    const input = userMessages.map(m => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`).join('\n');
+    
+    // 构建 instructions
+    const instructions = systemMessages.length > 0
+      ? systemMessages.map(m => m.content).join('\n')
+      : '你是一个专业的 AI 助手，直接回答用户的问题。';
 
-      const options = {
-        hostname: 'api.siliconflow.cn',
-        port: 443,
-        path: '/v1/chat/completions',
+    if (aiMode === 'llm') {
+      // LLM 模式 - 使用 SiliconFlow
+      console.log('[callLLM] 使用 LLM 模式 (SiliconFlow)');
+      const llmResponse = await fetch(`${SILICONFLOW_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Length': body.byteLength,
-        }
-      };
-
-      const req = https.request(options, (res: any) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => {
-          const data = Buffer.concat(chunks).toString('utf8');
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.choices && parsed.choices[0]) {
-              resolve(parsed.choices[0].message.content);
-            } else {
-              reject(new Error('LLM响应格式错误'));
-            }
-          } catch (e) {
-            reject(new Error('解析LLM响应失败'));
-          }
-        });
+          'Authorization': `Bearer ${SILICONFLOW_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: SILICONFLOW_MODEL || 'Qwen/Qwen2.5-7B-Instruct',
+          messages: [
+            { role: 'system', content: instructions },
+            { role: 'user', content: input }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7,
+        }),
       });
 
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    }).catch(reject);
-  });
+      if (!llmResponse.ok) {
+        const errorText = await llmResponse.text();
+        throw new Error(`LLM API error: ${llmResponse.status} - ${errorText}`);
+      }
+
+      const data = await llmResponse.json();
+      const outputText = data.choices?.[0]?.message?.content || '';
+      if (!outputText) {
+        throw new Error('Empty response from LLM');
+      }
+      return outputText;
+    } else {
+      // OpenClaw 模式
+      const response = await fetch(`${OPENCLAW_URL}/v1/responses`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENCLAW_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'openclaw',
+          input,
+          instructions,
+          stream: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenClaw API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      // 提取响应文本
+      let outputText = '';
+      if (data.output && Array.isArray(data.output)) {
+        for (const item of data.output) {
+          if (item.type === 'message' && item.content) {
+            const content = item.content;
+            if (Array.isArray(content)) {
+              for (const c of content) {
+                if (c.type === 'output_text' || c.type === 'text') {
+                  outputText = c.text || c.content || '';
+                  break;
+                }
+              }
+            }
+            if (!outputText && typeof content === 'string') {
+              outputText = content;
+            }
+          }
+          if (outputText) break;
+        }
+      }
+      
+      if (!outputText) {
+        throw new Error('Empty response from OpenClaw');
+      }
+      return outputText;
+    }
+  } catch (error) {
+    console.error('[callLLM] AI API call failed:', error);
+    throw error;
+  }
 }
 
 // 获取某员工的所有下属
@@ -1112,7 +1464,8 @@ function getEmployee(id: string): Employee | undefined {
 async function distributeTask(
   currentEmployeeId: string, 
   task: string,
-  depth: number = 0
+  depth: number = 0,
+  aiMode: 'openclaw' | 'llm' = 'openclaw'
 ): Promise<{ employee: Employee; result: string; subResults?: any[] }> {
   
   const employee = getEmployee(currentEmployeeId);
@@ -1168,11 +1521,11 @@ ${nonExecutorSubordinates.map(id => {
 }`;
 
     try {
-      console.log(`${indent}🤖 正在调用LLM...`);
+      console.log(`${indent}🤖 正在调用LLM (${aiMode})...`);
       const llmResponse = await callLLM([
         { role: 'system', content: '你是一个任务分解专家。请分析任务并合理分配给下属。' },
         { role: 'user', content: prompt }
-      ]);
+      ], aiMode);
       console.log(`${indent}📨 LLM响应: ${llmResponse.substring(0, 200)}...`);
 
       // 解析LLM响应
@@ -1207,7 +1560,7 @@ ${nonExecutorSubordinates.map(id => {
           
           console.log(`${indent}  → 分发给: ${subEmployeeId}, 任务: ${breakdown.subTask.substring(0, 30)}...`);
           if (subEmployeeId && subordinates.includes(subEmployeeId)) {
-            const subResult = await distributeTask(subEmployeeId, breakdown.subTask, depth + 1);
+            const subResult = await distributeTask(subEmployeeId, breakdown.subTask, depth + 1, aiMode);
             subResults.push(subResult);
           } else {
             console.log(`${indent}  ⚠️ 下属ID不匹配或不存在: ${subEmployeeId}`);
@@ -1229,7 +1582,7 @@ ${nonExecutorSubordinates.map(id => {
     const subResults = [];
     for (let i = 0; i < nonExecutorSubordinates.length; i++) {
       const subTask = taskParts[i] || `协助完成：${task}`;
-      const subResult = await distributeTask(nonExecutorSubordinates[i], subTask, depth + 1);
+      const subResult = await distributeTask(nonExecutorSubordinates[i], subTask, depth + 1, aiMode);
       subResults.push(subResult);
     }
 
@@ -1252,7 +1605,7 @@ ${nonExecutorSubordinates.map(id => {
       const result = await callLLM([
         { role: 'system', content: '你是一个专业的员工，负责完成分配的任务。' },
         { role: 'user', content: prompt }
-      ]);
+      ], aiMode);
 
       return {
         employee: { ...employee, id: employee.id },
@@ -1267,9 +1620,41 @@ ${nonExecutorSubordinates.map(id => {
   }
 }
 
-// 任务分发API
+// ========== 任务分发 API（单Agent协调模式） ==========
+
+// 构建组织拓扑描述
+function buildOrgTopology(): string {
+  const lines = ['## 组织架构'];
+  
+  for (const emp of employees) {
+    const subordinates = relationships
+      .filter(r => r.source === emp.id)
+      .map(r => {
+        const sub = employees.find(e => e.id === r.target);
+        return sub?.name || r.target;
+      });
+    
+    lines.push(`- ${emp.name} (ID: ${emp.id}, 类型: ${emp.type})${subordinates.length ? ' → 下属: ' + subordinates.join(', ') : ''}`);
+  }
+  
+  return lines.join('\n');
+}
+
+// 获取完整员工信息
+function getEmployeeDetails(emp: Employee): string {
+  return `
+- ID: ${emp.id}
+- 名称: ${emp.name}
+- 类型: ${emp.type}
+- 描述: ${emp.description || '无'}
+- 专长: ${emp.expertise?.join('、') || '无'}
+- 职责: ${emp.responsibilities?.join('、') || '无'}
+`.trim();
+}
+
+// 任务分发API（单Agent协调模式）
 app.post('/api/distribute-task', async (req, res) => {
-  const { task, startEmployeeId } = req.body;
+  const { task, startEmployeeId, teamId, aiMode = 'openclaw' } = req.body;
 
   if (!task) {
     return res.status(400).json({ error: '任务不能为空' });
@@ -1286,114 +1671,237 @@ app.post('/api/distribute-task', async (req, res) => {
     return res.status(400).json({ error: '未找到董事长，请先保存员工关系' });
   }
 
-  // 收集所有叶子节点（没有下属的员工）的结果
-function collectLeafResults(result: any): any[] {
-  const leafResults: any[] = [];
-  
-  // 如果没有子节点，自己就是叶子
-  if (!result.subResults || result.subResults.length === 0) {
-    // 排除 executor 本身
-    if (result.employee.type !== 'executor') {
-      leafResults.push(result);
+  try {
+    console.log('\n🚀 开始任务分发...');
+    console.log(`📋 任务: ${task}`);
+    console.log(`📦 团队ID: ${teamId || '未指定（使用所有员工）'}`);
+    console.log(`🤖 AI模式: ${aiMode}\n`);
+
+    // 获取当前团队的员工列表
+    const currentTeamEmployees = teamId 
+      ? employees.filter(e => teams.some(t => t.id === teamId && t.memberIds.includes(e.id)))
+      : employees;
+    const currentTeamEmployeeIds = new Set(currentTeamEmployees.map(e => e.id));
+    
+    // 过滤关系，只保留涉及当前团队员工的关系
+    const currentRelationships = relationships.filter(
+      r => currentTeamEmployeeIds.has(r.source) && currentTeamEmployeeIds.has(r.target)
+    );
+    
+    // 构建当前团队的拓扑信息
+    const employeeMap = new Map(currentTeamEmployees.map(e => [e.id, e]));
+    
+    const orgTopologyLines = ['## 组织架构（仅限当前团队）'];
+    for (const emp of currentTeamEmployees) {
+      const subordinates = currentRelationships
+        .filter(r => r.source === emp.id)
+        .map(r => employeeMap.get(r.target)?.name || r.target);
+      orgTopologyLines.push(`- ${emp.name} (ID: ${emp.id}, 类型: ${emp.type})${subordinates.length ? ' → 下属: ' + subordinates.join(', ') : ''}`);
     }
-  } else {
-    // 递归收集子节点
-    result.subResults.forEach((sub: any) => {
-      leafResults.push(...collectLeafResults(sub));
-    });
-  }
-  
-  return leafResults;
+    const orgTopology = orgTopologyLines.join('\n');
+    
+    const allEmployeesInfo = currentTeamEmployees.map(e => getEmployeeDetails(e)).join('\n');
+    
+    // 构建拓扑关系（谁向谁汇报）
+    const reportingLines = currentRelationships.map(r => {
+      const source = employeeMap.get(r.source);
+      const target = employeeMap.get(r.target);
+      return `${target?.name || r.target} → ${source?.name || r.source}（${source?.name}是${target?.name}的上级）`;
+    }).join('\n');
+
+    // 构建prompt，让OpenClaw一次性完成所有分析和生成
+    const prompt = `你是任务协调专家。请根据以下组织架构和任务，协调完成工作并生成结构化结果。
+
+【重要】只能分配任务给上述"详细员工信息"中列出的员工，不要分配给任何其他人员！
+
+${orgTopology}
+
+## 汇报关系（严格按照此关系执行）：
+${reportingLines}
+
+## 详细员工信息（仅限这些员工）：
+${allEmployeesInfo}
+
+## 任务：
+${task}
+
+请按照以下JSON格式输出（必须严格遵循JSON格式，不要有额外文字）：
+{
+  "task_analysis": "任务分析（50字以内）",
+  "node_responses": [
+    {
+      "employee_id": "员工ID",
+      "employee_name": "员工名称",
+      "task_assigned": "分配给该员工的子任务",
+      "response": "该员工的专业分析和回答"
+    }
+  ],
+  "final_command": "最终汇总的可执行命令（必须是具体的技术操作，包含所有重要的技术细节）"
 }
 
-try {
-    console.log('\n🚀 开始任务分发...');
-    console.log(`📌 起始员工: ${getEmployee(startId)?.name}`);
-    console.log(`📋 任务: ${task}\n`);
+注意：
+1. 必须考虑员工的专长来分配任务
+2. 必须按照汇报关系进行任务分解
+3. node_responses中每个员工的task_assigned应该是其直属上级的分配
+4. final_command必须包含所有重要的技术细节，如：
+   - 具体的技术栈和库（如 Canvas API、particles.js）
+   - 具体的参数值（如颜色代码、动画时长）
+   - 具体的实现方案（如粒子物理参数、贝塞尔曲线）
+   - 具体的代码结构（如需要的类名、函数名）
+5. final_command是给开发者看的执行命令，要足够详细以便直接实现`;
 
-    let result = await distributeTask(startId, task, 0);
+    const llmResponse = await callLLM([
+      { role: 'system', content: '你是一个专业的任务协调专家，负责分析任务、组织人员、生成执行方案。' },
+      { role: 'user', content: prompt }
+    ], aiMode);
 
-    // 检查是否有 executor 类型的员工
-    const executor = employees.find(e => e.type === 'executor');
-    console.log(`🔍 执行官信息: ${JSON.stringify(executor)}`);
-    console.log(`🔍 关系列表: ${JSON.stringify(relationships)}`);
-    
-    const executorInRelationship = relationships.some(r => r.target === executor?.id);
-    console.log(`🔍 执行官是否在关系中: ${executorInRelationship}`);
-    
-    // 如果 executor 在关系中，且有执行层结果，则汇总
-    if (executor && executorInRelationship) {
-      console.log(`\n🤖 检测到 OpenClaw执行官，准备汇总执行层结果...`);
-      
-      // 收集所有叶子节点的结果
-      const leafResults = collectLeafResults(result);
-      console.log(`📊 收集到 ${leafResults.length} 个执行层结果`);
-      
-      // 让 executor 汇总并优化
-      const executionOutputs = leafResults.map(r => 
-        `- ${r.employee.name} (${r.employee.type}): ${r.result}`
-      ).join('\n');
+    console.log('📨 LLM响应:', llmResponse.substring(0, 300), '...');
 
-      const executorPrompt = `你是 "OpenClaw执行官"，你的任务是从各执行者的输出中，提取出可以直接执行的、技术层面的具体命令。
-
-原始任务：${task}
-
-各执行者输出：
-${executionOutputs}
-
-请严格按照以下规则提取命令：
-1. 只提取需要"动手做"的技术操作，如：写代码、创建文件、运行命令、调用API、发送请求、安装包等
-2. 禁止提取以下类型的输出：
-   - 会议、沟通、讨论、协商等人与人交互的活动
-   - 检查、核对、确认、审核等监督类活动
-   - 计划、建议、分析、研究等思考类活动
-3. 每条命令必须是具体的、可直接执行的技术动作
-4. 命令格式：动词+具体操作对象，如"用Python写一个排序算法"、"调用硅基流动API生成图片"、"创建一个Hello World网页"等
-
-只输出命令，每行一条，不要有任何解释和文字说明：
-`;
-
-      try {
-        const summaryResult = await callLLM([
-          { role: 'system', content: '你是命令过滤专家。你的任务是从文本中只提取技术层面的可执行命令，过滤掉所有非技术操作。只输出命令，每行一条。' },
-          { role: 'user', content: executorPrompt }
-        ]);
-        
-        console.log(`✅ 执行官汇总完成`);
-        
-        // 将汇总结果添加到 executor 节点
-        result = {
-          ...result,
-          subResults: [
-            ...(result.subResults || []),
-            {
-              employee: { ...executor, id: executor.id },
-              result: summaryResult,
-              subResults: []
-            }
-          ]
-        };
-      } catch (error) {
-        console.error('❌ 执行官汇总失败:', error);
+    // 解析LLM响应
+    let parsed;
+    let rawJson: any = null;
+    try {
+      // 提取 JSON（支持 markdown 代码块格式）
+      let jsonStr = llmResponse;
+      const codeBlockMatch = llmResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1];
       }
+      
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        // 尝试修复格式错误的 JSON
+        const fixedJson = fixMalformedJSON(jsonMatch[0]);
+        parsed = JSON.parse(fixedJson);
+        rawJson = parsed;
+      } else {
+        throw new Error('No JSON found in response');
+      }
+    } catch (parseError) {
+      console.error('❌ JSON解析失败，尝试降级处理:', parseError);
+      // 降级方案：直接使用 LLM 响应作为结果
+      const startEmployee = getEmployee(startId);
+      
+      // 尝试从原始响应中提取有用信息
+      const fallbackResult = {
+        task_analysis: '任务分析完成',
+        node_responses: [] as any[],
+        final_command: llmResponse.slice(0, 500),
+      };
+      
+      // 尝试提取任何看起来像员工任务的内容
+      const taskMatches = llmResponse.matchAll(/(?:员工|employee)[^:：]*[：:]\s*([^\n]+)/gi);
+      for (const match of taskMatches) {
+        fallbackResult.node_responses.push({
+          employee_id: 'unknown',
+          employee_name: '未知员工',
+          task_assigned: match[1]?.trim() || '',
+          response: '（待处理）',
+        });
+      }
+      
+      parsed = fallbackResult;
+      rawJson = fallbackResult;
+      console.log('📨 使用降级方案处理响应');
     }
+
+    const startEmployee = getEmployee(startId);
+    
+    const result = {
+      employee: startEmployee,
+      result: parsed.task_analysis || '任务分析完成',
+      nodeResponses: parsed.node_responses || [],
+      finalCommand: parsed.final_command || '',
+      rawJson: parsed
+    };
+
+    console.log('✅ 任务分发完成');
 
     res.json({ 
       success: true, 
       data: {
         task,
-        startEmployee: getEmployee(startId),
+        startEmployee,
         result
       }
     });
   } catch (error) {
-    console.error('任务执行失败:', error);
+    console.error('❌ 任务分发失败:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    res.status(500).json({ error: '任务执行失败', details: errorMessage });
+    res.status(500).json({ error: '任务分发失败', details: errorMessage });
   }
 });
 
-// OpenClaw 代理接口
+// AI 任务执行接口（支持 OpenClaw 和 LLM 双模式）
+app.post('/api/task/execute', async (req, res) => {
+  const { input, aiMode = 'openclaw', model } = req.body;
+  
+  const openclawUrl = process.env.OPENCLAW_URL || 'http://127.0.0.1:18789';
+  const openclawToken = process.env.OPENCLAW_TOKEN || '';
+  const agentId = process.env.OPENCLAW_AGENT_ID || 'main';
+
+  try {
+    if (aiMode === 'llm') {
+      // LLM 模式 - 使用 SiliconFlow
+      const llmBaseUrl = 'https://api.siliconflow.cn/v1';
+      const llmApiKey = process.env.SILICONFLOW_API_KEY || '';
+      const llmModel = model || 'Qwen/Qwen2.5-7B-Instruct';
+
+      const response = await fetch(`${llmBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${llmApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: llmModel,
+          messages: [
+            { role: 'system', content: '你是一个专业的助手，负责回答问题和执行任务。' },
+            { role: 'user', content: input }
+          ],
+          max_tokens: 2000,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[LLM] Task execution failed:', response.status, errorText);
+        return res.status(response.status).json({ error: { message: `LLM API 调用失败: ${response.status}` } });
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '无返回内容';
+      
+      // 转换为与 OpenClaw 一致的格式
+      return res.json({
+        output: [{ type: 'message', content: content }]
+      });
+    } else {
+      // OpenClaw 模式
+      const response = await fetch(`${openclawUrl}/v1/responses`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openclawToken}`,
+          'Content-Type': 'application/json',
+          'x-openclaw-agent-id': agentId,
+        },
+        body: JSON.stringify({
+          model: model || 'openclaw',
+          input,
+        }),
+      });
+
+      const data = await response.json();
+      return res.json(data);
+    }
+  } catch (error) {
+    console.error('[Task Execute] AI API 调用失败:', error);
+    res.status(500).json({ error: { message: 'AI API 调用失败' } });
+  }
+});
+
+// OpenClaw 代理接口（保留向后兼容）
 app.post('/api/openclaw/execute', async (req, res) => {
   const { input, model = 'openclaw' } = req.body;
   

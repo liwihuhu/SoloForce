@@ -27,18 +27,18 @@ export default function Sidebar() {
     <div style={{
       width: '300px',
       height: 'calc(100vh - 50px)',
-      background: 'linear-gradient(180deg, #1E293B 0%, #0F172A 100%)',
-      borderRight: '1px solid rgba(6, 182, 212, 0.2)',
+      background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
+      borderRight: '1px solid var(--accent-border)',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      boxShadow: '4px 0 24px rgba(0, 0, 0, 0.3)',
+      boxShadow: '4px 0 24px var(--shadow)',
     }}>
       {/* 头部 */}
       <div style={{
         padding: '20px',
-        borderBottom: '1px solid rgba(6, 182, 212, 0.2)',
-        background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%)',
+        borderBottom: '1px solid var(--accent-border)',
+        background: 'linear-gradient(135deg, var(--accent-muted) 0%, var(--bg-primary) 100%)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
@@ -56,19 +56,19 @@ export default function Sidebar() {
             style={{
               width: '100%',
               padding: '8px 12px',
-              border: '1px solid rgba(6, 182, 212, 0.3)',
+              border: '1px solid var(--accent-border)',
               borderRadius: '8px',
               fontSize: '13px',
-              backgroundColor: 'rgba(30, 41, 59, 0.9)',
-              color: '#F1F5F9',
+              backgroundColor: 'var(--bg-input)',
+              color: 'var(--text-primary)',
               cursor: 'pointer',
               outline: 'none',
               marginBottom: '8px',
             }}
           >
-            <option value="" style={{ background: '#1E293B' }}>选择团队...</option>
+            <option value="" style={{ background: 'var(--bg-secondary)' }}>选择团队...</option>
             {teams.map(team => (
-              <option key={team.id} value={team.id} style={{ background: '#1E293B' }}>
+              <option key={team.id} value={team.id} style={{ background: 'var(--bg-secondary)' }}>
                 {team.name}
               </option>
             ))}
@@ -77,7 +77,7 @@ export default function Sidebar() {
           <h1 style={{ 
             fontSize: '18px', 
             fontWeight: 'bold', 
-            background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+            background: 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             margin: 0,
@@ -86,7 +86,7 @@ export default function Sidebar() {
           </h1>
           <p style={{ 
             fontSize: '11px', 
-            color: '#64748B', 
+            color: 'var(--text-muted)', 
             margin: '4px 0 0 0' 
           }}>
             点击查看详情
@@ -103,7 +103,7 @@ export default function Sidebar() {
             style={{
               padding: '4px 10px',
               background: 'rgba(239, 68, 68, 0.2)',
-              color: '#EF4444',
+              color: 'var(--danger)',
               border: '1px solid rgba(239, 68, 68, 0.3)',
               borderRadius: '6px',
               fontSize: '11px',
@@ -126,7 +126,7 @@ export default function Sidebar() {
         <h3 style={{
           fontSize: '11px',
           fontWeight: 600,
-          color: '#64748B',
+          color: 'var(--text-muted)',
           marginBottom: '12px',
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
@@ -149,8 +149,8 @@ export default function Sidebar() {
                   borderRadius: '12px',
                   cursor: 'pointer',
                   background: isSelected 
-                    ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)'
-                    : 'rgba(30, 41, 59, 0.5)',
+                    ? 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)'
+                    : 'var(--bg-card)',
                   border: `1px solid ${isSelected ? 'rgba(6, 182, 212, 0.4)' : 'transparent'}`,
                   transition: 'all 0.2s ease',
                   display: 'flex',
@@ -164,7 +164,7 @@ export default function Sidebar() {
                   height: '36px', 
                   borderRadius: '50%',
                   overflow: 'hidden',
-                  background: '#1E293B',
+                  background: 'var(--bg-secondary)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -180,7 +180,7 @@ export default function Sidebar() {
                   <div style={{
                     fontSize: '14px',
                     fontWeight: 500,
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -206,10 +206,10 @@ export default function Sidebar() {
                   {hasSubordinates && (
                     <span style={{ 
                       fontSize: '11px', 
-                      background: 'rgba(6, 182, 212, 0.2)',
+                      background: 'var(--accent-muted)',
                       padding: '2px 6px',
                       borderRadius: '8px',
-                      color: '#06B6D4'
+                      color: 'var(--accent)'
                     }}>
                       {edges.filter(e => e.source === emp.id).length}
                     </span>
@@ -224,16 +224,16 @@ export default function Sidebar() {
       {/* 选中员工详情 */}
       {selected && (
         <div style={{
-          borderTop: '1px solid rgba(6, 182, 212, 0.2)',
+          borderTop: '1px solid var(--accent-border)',
           padding: '20px',
-          background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
+          background: 'linear-gradient(180deg, var(--bg-card) 0%, var(--bg-primary) 100%)',
           maxHeight: '45%',
           overflowY: 'auto',
         }}>
           <h3 style={{
             fontSize: '11px',
             fontWeight: 600,
-            color: '#64748B',
+            color: 'var(--text-muted)',
             marginBottom: '16px',
             textTransform: 'uppercase',
             letterSpacing: '0.5px',
@@ -252,9 +252,9 @@ export default function Sidebar() {
               height: '64px', 
               borderRadius: '50%',
               overflow: 'hidden',
-              background: '#1E293B',
-              border: '2px solid rgba(6, 182, 212, 0.3)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              background: 'var(--bg-secondary)',
+              border: '2px solid var(--accent-border)',
+              boxShadow: 'var(--shadow-card)',
             }}>
               {selected.avatar && selected.avatar.startsWith('/') ? (
                 <img src={selected.avatar} alt={selected.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -265,7 +265,7 @@ export default function Sidebar() {
             <div>
               <div style={{ 
                 fontWeight: 600, 
-                color: '#F1F5F9',
+                color: 'var(--text-primary)',
                 fontSize: '18px'
               }}>
                 {selected.name}
@@ -287,7 +287,7 @@ export default function Sidebar() {
 
           <p style={{
             fontSize: '13px',
-            color: '#94A3B8',
+            color: 'var(--text-secondary)',
             marginBottom: '20px',
             lineHeight: 1.6,
           }}>
@@ -303,17 +303,17 @@ export default function Sidebar() {
               gap: '10px',
               fontSize: '13px',
               padding: '10px 14px',
-              background: 'rgba(30, 41, 59, 0.6)',
+              background: 'var(--bg-card)',
               borderRadius: '10px',
-              border: '1px solid rgba(6, 182, 212, 0.1)',
+              border: '1px solid var(--accent-border)',
             }}>
-              <span style={{ color: '#64748B' }}>⬆️ 上级:</span>
+              <span style={{ color: 'var(--text-muted)' }}>⬆️ 上级:</span>
               {manager ? (
                 <span style={{ 
-                  color: '#06B6D4', 
+                  color: 'var(--accent)', 
                   fontWeight: 500,
                   cursor: 'pointer',
-                  background: 'rgba(6, 182, 212, 0.1)',
+                  background: 'var(--accent-bg)',
                   padding: '2px 10px',
                   borderRadius: '6px',
                 }}
@@ -322,7 +322,7 @@ export default function Sidebar() {
                   {getEmployee(manager)?.name}
                 </span>
               ) : (
-                <span style={{ color: '#475569' }}>（无）</span>
+                <span style={{ color: 'var(--text-muted)' }}>（无）</span>
               )}
             </div>
 
@@ -333,21 +333,21 @@ export default function Sidebar() {
               gap: '10px',
               fontSize: '13px',
               padding: '10px 14px',
-              background: 'rgba(30, 41, 59, 0.6)',
+              background: 'var(--bg-card)',
               borderRadius: '10px',
-              border: '1px solid rgba(6, 182, 212, 0.1)',
+              border: '1px solid var(--accent-border)',
             }}>
-              <span style={{ color: '#64748B', minWidth: '45px' }}>⬇️ 下属:</span>
+              <span style={{ color: 'var(--text-muted)', minWidth: '45px' }}>⬇️ 下属:</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {subordinates.length > 0 ? (
                   subordinates.map(subId => (
                     <span 
                       key={subId}
                       style={{ 
-                        color: '#06B6D4', 
+                        color: 'var(--accent)', 
                         fontWeight: 500,
                         cursor: 'pointer',
-                        background: 'rgba(6, 182, 212, 0.1)',
+                        background: 'var(--accent-bg)',
                         padding: '2px 10px',
                         borderRadius: '6px',
                         fontSize: '12px',
@@ -358,7 +358,7 @@ export default function Sidebar() {
                     </span>
                   ))
                 ) : (
-                  <span style={{ color: '#475569' }}>（无）</span>
+                  <span style={{ color: 'var(--text-muted)' }}>（无）</span>
                 )}
               </div>
             </div>
@@ -368,18 +368,18 @@ export default function Sidebar() {
               marginTop: '4px',
               padding: '12px 16px',
               background: subordinates.length > 0 
-                ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%)'
-                : 'rgba(30, 41, 59, 0.6)',
+                ? 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)'
+                : 'var(--bg-card)',
               borderRadius: '12px',
               fontSize: '12px',
               border: `1px solid ${subordinates.length > 0 ? 'rgba(6, 182, 212, 0.2)' : 'rgba(148, 163, 184, 0.1)'}`,
             }}>
               {subordinates.length > 0 ? (
-                <span style={{ color: '#06B6D4', fontWeight: 500 }}>
+                <span style={{ color: 'var(--accent)', fontWeight: 500 }}>
                   🔹 管理者（有 {subordinates.length} 名下属）
                 </span>
               ) : (
-                <span style={{ color: '#64748B' }}>
+                <span style={{ color: 'var(--text-muted)' }}>
                   🔸 执行者（无下属）
                 </span>
               )}
@@ -391,18 +391,18 @@ export default function Sidebar() {
       {/* 统计 */}
       <div style={{
         padding: '14px 20px',
-        borderTop: '1px solid rgba(6, 182, 212, 0.2)',
-        background: 'rgba(15, 23, 42, 0.8)',
+        borderTop: '1px solid var(--accent-border)',
+        background: 'var(--bg-secondary)',
         fontSize: '12px',
-        color: '#64748B',
+        color: 'var(--text-muted)',
         display: 'flex',
         justifyContent: 'space-between',
       }}>
         <span style={{ 
-          background: 'rgba(6, 182, 212, 0.1)', 
+          background: 'var(--accent-bg)', 
           padding: '4px 12px', 
           borderRadius: '20px',
-          color: '#06B6D4'
+          color: 'var(--accent)'
         }}>
           👥 员工: {employeeList.length}
         </span>

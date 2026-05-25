@@ -208,6 +208,8 @@ interface TopologyState {
   currentTeamId: string | null;
   selectedEmployee: string | null;
   savedPath: string | null;
+  // AI 运行模式：'openclaw' | 'llm'
+  aiMode: 'openclaw' | 'llm';
   
   // Actions
   onNodesChange: OnNodesChange;
@@ -224,6 +226,7 @@ interface TopologyState {
   reloadTeams: () => Promise<void>;
   switchTeam: (team: Team) => void;
   getRelationships: () => Relationship[];
+  setAIMode: (mode: 'openclaw' | 'llm') => void;
 }
 
 export const useTopologyStore = create<TopologyState>((set, get) => ({
@@ -234,6 +237,12 @@ export const useTopologyStore = create<TopologyState>((set, get) => ({
   currentTeamId: null,
   selectedEmployee: null,
   savedPath: null,
+  aiMode: (localStorage.getItem('ai_mode') as 'openclaw' | 'llm') || 'openclaw',
+
+  setAIMode: (mode) => {
+    localStorage.setItem('ai_mode', mode);
+    set({ aiMode: mode });
+  },
 
   onNodesChange: (changes) => {
     set({

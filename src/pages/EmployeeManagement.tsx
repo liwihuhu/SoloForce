@@ -6,13 +6,29 @@ const API_BASE = 'http://localhost:5301';
 
 // 状态选项
 const STATUS_OPTIONS: { value: EmployeeStatus; label: string; color: string }[] = [
-  { value: 'idle', label: '空闲', color: '#10B981' },
-  { value: 'busy', label: '工作中', color: '#F59E0B' },
+  { value: 'idle', label: '空闲', color: 'var(--success)' },
+  { value: 'busy', label: '工作中', color: 'var(--warning)' },
   { value: 'offline', label: '离线', color: '#6B7280' },
 ];
 
 // 所有角色类型
 const ALL_ROLE_TYPES = getAllRoleTypes();
+
+// 性格标签选项
+const PERSONALITY_TAGS = [
+  { value: 'analytical', label: '🔍 分析型', desc: '注重数据与逻辑，决策谨慎' },
+  { value: 'creative', label: '💡 创意型', desc: '思维活跃，善于提出新想法' },
+  { value: 'pragmatic', label: '⚡ 实干型', desc: '注重落地执行，关注可行性' },
+  { value: 'diplomatic', label: '🤝 协调型', desc: '擅长沟通调解，平衡各方利益' },
+  { value: 'bold', label: '🚀 进取型', desc: '敢于冒险，追求快速增长' },
+  { value: 'cautious', label: '🛡️ 稳健型', desc: '风险意识强，决策保守' },
+  { value: 'empathetic', label: '❤️ 共情型', desc: '关注人的感受，重视团队氛围' },
+  { value: 'critical', label: '❄️ 批判型', desc: '善于发现问题，质疑现状' },
+  { value: 'optimistic', label: '☀️ 乐观型', desc: '积极正面，相信问题都能解决' },
+  { value: 'pessimistic', label: '🌧️ 谨慎型', desc: '习惯考虑 worst case，防患未然' },
+  { value: 'leadership', label: '👑 主导型', desc: '喜欢掌控节奏，引导讨论方向' },
+  { value: 'supportive', label: '🌿 支持型', desc: '配合他人，补充细节与信息' },
+];
 
 interface EmployeeFormData {
   name: string;
@@ -24,6 +40,7 @@ interface EmployeeFormData {
   avatar: string;
   expertise: string[];  // 改为数组
   responsibilities: string;
+  personalities: string[];  // 性格标签
 }
 
 const defaultFormData: EmployeeFormData = {
@@ -36,6 +53,7 @@ const defaultFormData: EmployeeFormData = {
   avatar: EMPLOYEE_AVATARS.developer,
   expertise: [],
   responsibilities: '',
+  personalities: [],
 };
 
 export default function EmployeeManagement() {
@@ -121,6 +139,21 @@ export default function EmployeeManagement() {
     });
   };
 
+  // 添加性格标签
+  const togglePersonality = (tag: string) => {
+    if (formData.personalities.includes(tag)) {
+      setFormData({
+        ...formData,
+        personalities: formData.personalities.filter(p => p !== tag),
+      });
+    } else {
+      setFormData({
+        ...formData,
+        personalities: [...formData.personalities, tag],
+      });
+    }
+  };
+
   // 加载员工数据
   const fetchEmployees = async () => {
     setLoading(true);
@@ -167,6 +200,7 @@ export default function EmployeeManagement() {
       avatar: emp.avatar,
       expertise: emp.expertise || [],
       responsibilities: emp.responsibilities?.join(', ') || '',
+      personalities: emp.personalities || [],
     });
     setShowModal(true);
   };
@@ -190,6 +224,7 @@ export default function EmployeeManagement() {
         avatar: formData.avatar,
         expertise: formData.expertise,
         responsibilities: formData.responsibilities.split(',').map(s => s.trim()).filter(Boolean),
+        personalities: formData.personalities,
       };
 
       let res;
@@ -264,11 +299,11 @@ export default function EmployeeManagement() {
   };
 
   const getStatusConfig = (status: EmployeeStatus) => {
-    return STATUS_OPTIONS.find(s => s.value === status) || { label: '未知', color: '#64748B' };
+    return STATUS_OPTIONS.find(s => s.value === status) || { label: '未知', color: 'var(--text-muted)' };
   };
 
   return (
-    <div style={{ padding: '24px', height: '100%', overflow: 'auto', background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)' }}>
+    <div style={{ padding: '24px', height: '100%', overflow: 'auto', background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)' }}>
       {/* 顶部工具栏 */}
       <div style={{ 
         display: 'flex', 
@@ -282,7 +317,7 @@ export default function EmployeeManagement() {
           margin: 0, 
           fontSize: '24px', 
           fontWeight: 600,
-          background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+          background: 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}>
@@ -298,12 +333,12 @@ export default function EmployeeManagement() {
             onChange={(e) => setSearch(e.target.value)}
             style={{
               padding: '10px 16px',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
+              border: '1px solid var(--border-default)',
               borderRadius: '10px',
               fontSize: '14px',
               width: '200px',
-              background: 'rgba(30, 41, 59, 0.8)',
-              color: '#F1F5F9',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
               outline: 'none',
             }}
           />
@@ -314,17 +349,17 @@ export default function EmployeeManagement() {
             onChange={(e) => setTypeFilter(e.target.value)}
             style={{
               padding: '10px 16px',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
+              border: '1px solid var(--border-default)',
               borderRadius: '10px',
               fontSize: '14px',
-              backgroundColor: 'rgba(30, 41, 59, 0.8)',
-              color: '#F1F5F9',
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--text-primary)',
               outline: 'none',
             }}
           >
-            <option value="" style={{ background: '#1E293B' }}>全部类型</option>
+            <option value="" style={{ background: 'var(--bg-secondary)' }}>全部类型</option>
             {ALL_ROLE_TYPES.map(t => (
-              <option key={t.value} value={t.value} style={{ background: '#1E293B' }}>{t.label}</option>
+              <option key={t.value} value={t.value} style={{ background: 'var(--bg-secondary)' }}>{t.label}</option>
             ))}
           </select>
           
@@ -334,16 +369,16 @@ export default function EmployeeManagement() {
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{
               padding: '10px 16px',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
+              border: '1px solid var(--border-default)',
               borderRadius: '10px',
               fontSize: '14px',
-              background: 'rgba(30, 41, 59, 0.8)',
-              color: '#F1F5F9',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
             }}
           >
             <option value="">全部状态</option>
             {STATUS_OPTIONS.map(s => (
-              <option key={s.value} value={s.value} style={{ background: '#1E293B' }}>{s.label}</option>
+              <option key={s.value} value={s.value} style={{ background: 'var(--bg-secondary)' }}>{s.label}</option>
             ))}
           </select>
         </div>
@@ -372,7 +407,7 @@ export default function EmployeeManagement() {
 
       {/* 员工列表 */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#64748B' }}>
+        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}></div>
           加载中...
         </div>
@@ -396,11 +431,11 @@ export default function EmployeeManagement() {
               <div
                 key={emp.id}
                 style={{
-                  background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%)',
+                  background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-primary) 100%)',
                   borderRadius: '16px',
                   padding: '20px',
                   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                  border: '1px solid rgba(6, 182, 212, 0.2)',
+                  border: '1px solid var(--accent-border)',
                   backdropFilter: 'blur(12px)',
                 }}
               >
@@ -410,11 +445,11 @@ export default function EmployeeManagement() {
                     width: '52px',
                     height: '52px',
                     borderRadius: '14px',
-                    background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)',
+                    background: 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: '1px solid rgba(6, 182, 212, 0.3)',
+                    border: '1px solid var(--accent-border)',
                   }}>
                     {emp.avatar && emp.avatar.startsWith('/') ? (
                       <img src={emp.avatar} alt={emp.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -423,10 +458,10 @@ export default function EmployeeManagement() {
                     )}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '4px', color: '#F1F5F9' }}>
+                    <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '4px', color: 'var(--text-primary)' }}>
                       {emp.name}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#94A3B8' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
                       {emp.roleName || emp.name}
                     </div>
                   </div>
@@ -456,14 +491,14 @@ export default function EmployeeManagement() {
                     {ALL_ROLE_TYPES.find(t => t.value === emp.type)?.label || emp.type}
                   </span>
                   {emp.department && (
-                    <span style={{ marginLeft: '10px', fontSize: '13px', color: '#64748B' }}>
+                    <span style={{ marginLeft: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
                       {emp.department}
                     </span>
                   )}
                 </div>
 
                 {/* 描述 */}
-                <div style={{ fontSize: '14px', color: '#94A3B8', marginBottom: '14px', lineHeight: 1.6 }}>
+                <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.6 }}>
                   {emp.description}
                 </div>
 
@@ -475,37 +510,58 @@ export default function EmployeeManagement() {
                         padding: '4px 10px',
                         borderRadius: '8px',
                         fontSize: '11px',
-                        background: 'rgba(6, 182, 212, 0.15)',
-                        color: '#06B6D4',
-                        border: '1px solid rgba(6, 182, 212, 0.2)',
+                        background: 'var(--accent-bg)',
+                        color: 'var(--accent)',
+                        border: '1px solid var(--accent-border)',
                       }}>
                         {skill}
                       </span>
                     ))}
                     {emp.expertise.length > 3 && (
-                      <span style={{ fontSize: '11px', color: '#64748B' }}>+{emp.expertise.length - 3}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+{emp.expertise.length - 3}</span>
                     )}
                   </div>
                 )}
 
+                {/* 性格标签 */}
+                {emp.personalities && emp.personalities.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+                    {emp.personalities.map((tag, i) => {
+                      const tagInfo = PERSONALITY_TAGS.find(t => t.value === tag);
+                      return (
+                        <span key={i} style={{
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '10px',
+                          background: 'rgba(139, 92, 246, 0.15)',
+                          color: '#A78BFA',
+                          border: '1px solid rgba(139, 92, 246, 0.3)',
+                        }}>
+                          {tagInfo?.label || tag}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* 操作按钮 */}
-                <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid rgba(148, 163, 184, 0.2)', paddingTop: '14px' }}>
+                <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border-default)', paddingTop: '14px' }}>
                   {/* 状态切换 */}
                   <select
                     value={emp.status}
                     onChange={(e) => handleStatusChange(emp, e.target.value as EmployeeStatus)}
                     style={{
                       padding: '6px 10px',
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      border: '1px solid var(--border-default)',
                       borderRadius: '8px',
                       fontSize: '12px',
-                      background: 'rgba(30, 41, 59, 0.8)',
-                      color: '#F1F5F9',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)',
                       cursor: 'pointer',
                     }}
                   >
                     {STATUS_OPTIONS.map(s => (
-                      <option key={s.value} value={s.value} style={{ background: '#1E293B' }}>{s.label}</option>
+                      <option key={s.value} value={s.value} style={{ background: 'var(--bg-secondary)' }}>{s.label}</option>
                     ))}
                   </select>
                   
@@ -514,7 +570,7 @@ export default function EmployeeManagement() {
                     style={{
                       flex: 1,
                       padding: '8px 14px',
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                      background: 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)',
                       color: '#A78BFA',
                       border: '1px solid rgba(139, 92, 246, 0.3)',
                       borderRadius: '8px',
@@ -530,7 +586,7 @@ export default function EmployeeManagement() {
                       onClick={() => handleDelete(emp)}
                       style={{
                         padding: '8px 14px',
-                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                        background: 'linear-gradient(135deg, var(--danger-bg) 0%, var(--danger-bg) 100%)',
                         color: '#F87171',
                         border: '1px solid rgba(239, 68, 68, 0.3)',
                         borderRadius: '8px',
@@ -564,13 +620,13 @@ export default function EmployeeManagement() {
           backdropFilter: 'blur(4px)',
         }} onClick={() => setShowModal(false)}>
           <div style={{
-            background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+            background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
             borderRadius: '20px',
             padding: '28px',
             width: '520px',
             maxHeight: '85vh',
             overflow: 'auto',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
+            border: '1px solid var(--accent-border)',
             boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
           }} onClick={e => e.stopPropagation()}>
             <h2 style={{ 
@@ -587,8 +643,8 @@ export default function EmployeeManagement() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               {/* 姓名 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
-                  姓名 <span style={{ color: '#EF4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  姓名 <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -597,11 +653,11 @@ export default function EmployeeManagement() {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: '10px',
                     fontSize: '14px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                   }}
                 />
@@ -609,8 +665,8 @@ export default function EmployeeManagement() {
 
               {/* 行业选择 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
-                  行业 <span style={{ color: '#EF4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  行业 <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
                 <select
                   value={formData.industry}
@@ -618,16 +674,16 @@ export default function EmployeeManagement() {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: '10px',
                     fontSize: '14px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                   }}
                 >
                   {INDUSTRY_TEMPLATES.map(ind => (
-                    <option key={ind.id} value={ind.id} style={{ background: '#1E293B' }}>
+                    <option key={ind.id} value={ind.id} style={{ background: 'var(--bg-secondary)' }}>
                       {ind.icon} {ind.name}
                     </option>
                   ))}
@@ -637,7 +693,7 @@ export default function EmployeeManagement() {
               {/* 自定义行业输入 */}
               {formData.industry === 'custom' && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
+                  <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
                     自定义行业名称
                   </label>
                   <input
@@ -652,7 +708,7 @@ export default function EmployeeManagement() {
                       borderRadius: '8px',
                       fontSize: '14px',
                       background: 'rgba(15, 23, 42, 0.8)',
-                      color: '#F1F5F9',
+                      color: 'var(--text-primary)',
                       outline: 'none',
                     }}
                   />
@@ -661,8 +717,8 @@ export default function EmployeeManagement() {
 
               {/* 角色类型 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
-                  角色类型 <span style={{ color: '#EF4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  角色类型 <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
                 {formData.industry !== 'custom' ? (
                   <select
@@ -671,16 +727,16 @@ export default function EmployeeManagement() {
                     style={{
                       width: '100%',
                       padding: '12px 16px',
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      border: '1px solid var(--border-default)',
                       borderRadius: '10px',
                       fontSize: '14px',
                       background: 'rgba(15, 23, 42, 0.8)',
-                      color: '#F1F5F9',
+                      color: 'var(--text-primary)',
                       outline: 'none',
                     }}
                   >
                     {getRolesByIndustry(formData.industry).map(role => (
-                      <option key={role.type} value={role.type} style={{ background: '#1E293B' }}>
+                      <option key={role.type} value={role.type} style={{ background: 'var(--bg-secondary)' }}>
                         {role.label}
                       </option>
                     ))}
@@ -701,7 +757,7 @@ export default function EmployeeManagement() {
                       borderRadius: '8px',
                       fontSize: '14px',
                       background: 'rgba(15, 23, 42, 0.8)',
-                      color: '#F1F5F9',
+                      color: 'var(--text-primary)',
                       outline: 'none',
                     }}
                   />
@@ -710,7 +766,7 @@ export default function EmployeeManagement() {
 
               {/* 专业领域（标签） */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   专业领域
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
@@ -757,11 +813,11 @@ export default function EmployeeManagement() {
                     style={{
                       flex: 1,
                       padding: '10px 14px',
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
+                      border: '1px solid var(--border-default)',
                       borderRadius: '8px',
                       fontSize: '14px',
                       background: 'rgba(15, 23, 42, 0.8)',
-                      color: '#F1F5F9',
+                      color: 'var(--text-primary)',
                       outline: 'none',
                     }}
                   />
@@ -784,8 +840,8 @@ export default function EmployeeManagement() {
 
               {/* 角色描述（AI提示词） */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
-                  🤖 AI角色提示词 <span style={{ fontSize: '12px', color: '#64748B' }}>（用于会议协商时定义AI行为）</span>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  🤖 AI角色提示词 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>（用于会议协商时定义AI行为）</span>
                 </label>
                 <textarea
                   value={formData.description}
@@ -795,11 +851,11 @@ export default function EmployeeManagement() {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: '10px',
                     fontSize: '14px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                     resize: 'vertical',
                   }}
@@ -808,7 +864,7 @@ export default function EmployeeManagement() {
 
               {/* 部门 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   部门
                 </label>
                 <input
@@ -819,19 +875,53 @@ export default function EmployeeManagement() {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: '10px',
                     fontSize: '14px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                   }}
                 />
               </div>
 
+              {/* 性格标签 */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  🧠 性格标签 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>（影响会议发言风格）</span>
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {PERSONALITY_TAGS.map(tag => (
+                    <button
+                      key={tag.value}
+                      onClick={() => togglePersonality(tag.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        border: formData.personalities.includes(tag.value)
+                          ? '2px solid var(--accent)'
+                          : '2px solid var(--border-default)',
+                        background: formData.personalities.includes(tag.value)
+                          ? 'rgba(139, 92, 246, 0.2)'
+                          : 'var(--bg-secondary)',
+                        color: formData.personalities.includes(tag.value)
+                          ? '#A78BFA'
+                          : 'var(--text-secondary)',
+                        transition: 'all 0.2s',
+                      }}
+                      title={tag.desc}
+                    >
+                      {tag.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* 头像选择 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   头像
                 </label>
                 
@@ -848,8 +938,8 @@ export default function EmployeeManagement() {
                         borderRadius: '12px',
                         overflow: 'hidden',
                         cursor: 'pointer',
-                        border: formData.avatar === avatar ? '2px solid #06B6D4' : '2px solid transparent',
-                        background: '#1E293B',
+                        border: formData.avatar === avatar ? '2px solid var(--accent)' : '2px solid transparent',
+                        background: 'var(--bg-secondary)',
                         padding: '4px',
                         transition: 'all 0.2s',
                       }}
@@ -868,8 +958,8 @@ export default function EmployeeManagement() {
                         borderRadius: '12px',
                         overflow: 'hidden',
                         cursor: 'pointer',
-                        border: formData.avatar === avatar ? '2px solid #06B6D4' : '2px solid transparent',
-                        background: '#1E293B',
+                        border: formData.avatar === avatar ? '2px solid var(--accent)' : '2px solid transparent',
+                        background: 'var(--bg-secondary)',
                         padding: '4px',
                         transition: 'all 0.2s',
                       }}
@@ -884,10 +974,10 @@ export default function EmployeeManagement() {
                   <label
                     style={{
                       padding: '10px 16px',
-                      background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)',
-                      border: '1px solid rgba(6, 182, 212, 0.3)',
+                      background: 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)',
+                      border: '1px solid var(--accent-border)',
                       borderRadius: '10px',
-                      color: '#06B6D4',
+                      color: 'var(--accent)',
                       fontSize: '13px',
                       cursor: 'pointer',
                       display: 'inline-flex',
@@ -912,7 +1002,7 @@ export default function EmployeeManagement() {
                   {formData.avatar && !formData.avatar.startsWith('/') && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <img src={formData.avatar} alt="" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover' }} />
-                      <span style={{ fontSize: '12px', color: '#64748B' }}>本地图片</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>本地图片</span>
                     </div>
                   )}
                 </div>
@@ -940,7 +1030,7 @@ export default function EmployeeManagement() {
 
               {/* 职责 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   职责
                 </label>
                 <input
@@ -951,11 +1041,11 @@ export default function EmployeeManagement() {
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: '10px',
                     fontSize: '14px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                   }}
                 />
@@ -970,8 +1060,8 @@ export default function EmployeeManagement() {
                   flex: 1,
                   padding: '14px',
                   background: 'rgba(71, 85, 105, 0.3)',
-                  color: '#94A3B8',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-default)',
                   borderRadius: '12px',
                   fontSize: '14px',
                   fontWeight: 500,

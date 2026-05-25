@@ -31,17 +31,49 @@ interface TaskResult {
   employee: { id: string; name: string; type: string; avatar: string };
   result: string;
   subResults?: TaskResult[];
+  // 新格式字段
+  nodeResponses?: Array<{
+    employee_id: string;
+    employee_name: string;
+    task_assigned: string;
+    response: string;
+  }>;
+  finalCommand?: string;
+  rawJson?: {
+    task_analysis: string;
+    node_responses: Array<{
+      employee_id: string;
+      employee_name: string;
+      task_assigned: string;
+      response: string;
+    }>;
+    final_command: string;
+  };
 }
 
 // 收集所有员工的结果
 function collectEmployeeResults(result: TaskResult): Record<string, string> {
   const results: Record<string, string> = {};
-  results[result.employee.id] = result.result;
+  
+  // 处理新的扁平格式 (nodeResponses)
+  if (result.nodeResponses && Array.isArray(result.nodeResponses)) {
+    result.nodeResponses.forEach(node => {
+      results[node.employee_id] = node.response;
+    });
+  }
+  
+  // 处理旧的树状格式 (subResults)
   if (result.subResults) {
     result.subResults.forEach(sub => {
       Object.assign(results, collectEmployeeResults(sub));
     });
   }
+  
+  // 如果都没有，使用默认结果
+  if (Object.keys(results).length === 0) {
+    results[result.employee.id] = result.result;
+  }
+  
   return results;
 }
 
@@ -83,6 +115,10 @@ function MainView() {
 
   const handleTaskComplete = (result: TaskResult) => {
     const results = collectEmployeeResults(result);
+    console.log('[DEBUG] handleTaskComplete called');
+    console.log('[DEBUG] result.nodeResponses count:', result.nodeResponses?.length || 0);
+    console.log('[DEBUG] collected results keys:', Object.keys(results));
+    console.log('[DEBUG] employeeResults:', results);
     setEmployeeResults(prev => ({ ...prev, ...results }));
   };
 
@@ -104,6 +140,11 @@ function MainView() {
     const employee = node.data?.employee as { type: string } | undefined;
     const isSpecial = employee?.type === 'superadmin' || employee?.type === 'executor';
     const isSelected = selectedEmployee === node.id;
+    const hasResult = !!employeeResults[node.id];
+    
+    if (hasResult) {
+      console.log('[DEBUG] Node', node.id, 'has result:', employeeResults[node.id]?.substring(0, 30));
+    }
     
     return {
       ...node,
@@ -141,7 +182,7 @@ function MainView() {
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       {showSidebar && <Sidebar />}
       
-      <div style={{ flex: 1, height: '100%', position: 'relative', overflow: 'hidden', background: '#0F172A' }}>
+      <div style={{ flex: 1, height: '100%', position: 'relative', overflow: 'hidden', background: 'var(--bg-primary)' }}>
         <button
           onClick={() => setShowSidebar(!showSidebar)}
           style={{
@@ -150,14 +191,14 @@ function MainView() {
             left: '16px',
             zIndex: 10,
             padding: '8px 14px',
-            background: 'rgba(30, 41, 59, 0.9)',
+            background: 'var(--bg-card)',
             backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
+            border: '1px solid var(--accent-border)',
             borderRadius: '8px',
             fontSize: '12px',
-            color: '#E2E8F0',
+            color: 'var(--text-primary)',
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 4px 12px var(--shadow)',
           }}
         >
           {showSidebar ? '隐藏' : '显示'}
@@ -173,13 +214,13 @@ function MainView() {
               left: '86px',
               zIndex: 10,
               padding: '8px 14px',
-              background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+              background: 'linear-gradient(135deg, var(--accent) 0%, #0891B2 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
               fontSize: '12px',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)',
+              boxShadow: '0 4px 12px var(--accent-muted)',
               fontWeight: 500,
             }}
           >
@@ -204,7 +245,7 @@ function MainView() {
                 borderRadius: '8px',
                 fontSize: '12px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+                boxShadow: '0 4px 12px var(--accent-muted)',
                 fontWeight: 500,
               }}
             >
@@ -223,13 +264,13 @@ function MainView() {
                 left: '156px',
                 zIndex: 10,
                 padding: '8px 14px',
-                background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                background: 'linear-gradient(135deg, var(--warning) 0%, #D97706 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontSize: '12px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                boxShadow: '0 4px 12px var(--warning-bg)',
                 fontWeight: 500,
               }}
             >
@@ -253,13 +294,13 @@ function MainView() {
                 left: '226px',
                 zIndex: 10,
                 padding: '8px 14px',
-                background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                background: 'linear-gradient(135deg, var(--danger) 0%, #DC2626 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontSize: '12px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                boxShadow: '0 4px 12px var(--danger-bg)',
                 fontWeight: 500,
               }}
             >
@@ -278,15 +319,15 @@ function MainView() {
             zIndex: 10,
             padding: '8px 14px',
             background: showChatPanel 
-              ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-              : 'rgba(30, 41, 59, 0.9)',
+              ? 'linear-gradient(135deg, var(--warning) 0%, var(--warning) 100%)'
+              : 'var(--bg-card)',
             backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
+            border: '1px solid var(--warning)',
             borderRadius: '8px',
             fontSize: '12px',
             color: 'white',
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 4px 12px var(--shadow)',
             fontWeight: 500,
           }}
         >
@@ -311,34 +352,34 @@ function MainView() {
             nodesConnectable={isEditMode}
             style={{ 
               background: `
-                linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%),
+                linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card) 100%),
                 url('/bg-main.png')
               `,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="rgba(6, 182, 212, 0.3)" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="var(--accent-muted)" />
             <Controls 
               style={{ 
-                background: 'rgba(15, 23, 42, 0.9)', 
+                background: 'var(--bg-card)', 
                 borderRadius: '8px', 
-                border: '1px solid rgba(6, 182, 212, 0.3)',
+                border: '1px solid var(--border-default)',
                 bottom: '80px',
               }} 
             />
             <MiniMap 
               style={{ 
-                background: 'rgba(15, 23, 42, 0.9)', 
+                background: 'var(--bg-card)', 
                 borderRadius: '8px', 
-                border: '1px solid rgba(6, 182, 212, 0.3)',
+                border: '1px solid var(--border-default)',
                 bottom: '80px',
               }}
               nodeColor={(node) => {
                 const data = node.data as { employee: { type: string }, isExecuting?: boolean };
                 return getNodeColor(data?.employee?.type || '', !!data?.isExecuting);
               }}
-              maskColor="rgba(6, 182, 212, 0.1)"
+              maskColor="var(--accent-bg)"
             />
           </ReactFlow>
         ) : (
@@ -348,8 +389,8 @@ function MainView() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-            color: '#94A3B8',
+            background: 'linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
+            color: 'var(--text-secondary)',
           }}>
             <div style={{ 
               fontSize: '80px', 
@@ -357,10 +398,10 @@ function MainView() {
               filter: 'grayscale(0.5)',
               opacity: 0.6
             }}>👥</div>
-            <div style={{ fontSize: '20px', fontWeight: 500, marginBottom: '12px', color: '#E2E8F0' }}>
+            <div style={{ fontSize: '20px', fontWeight: 500, marginBottom: '12px', color: 'var(--text-primary)' }}>
               请先选择团队
             </div>
-            <div style={{ fontSize: '14px', color: '#64748B' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
               在右上角选择团队，或前往"团队管理"创建新团队
             </div>
           </div>
@@ -431,13 +472,13 @@ export default function App() {
         left: 0,
         right: 0,
         height: '56px',
-        background: 'linear-gradient(90deg, #0F172A 0%, #1E293B 100%)',
-        borderBottom: '1px solid rgba(6, 182, 212, 0.2)',
+        background: 'linear-gradient(90deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
+        borderBottom: '1px solid var(--border-default)',
         display: 'flex',
         alignItems: 'center',
         padding: '0 24px',
         zIndex: 100,
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 4px 20px var(--shadow)',
       }}>
         {/* Logo */}
         <div 
@@ -456,11 +497,11 @@ export default function App() {
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+              background: 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 15px rgba(6, 182, 212, 0.4)',
+              boxShadow: '0 4px 15px var(--accent-muted)',
               fontSize: '18px',
             }}>
               S
@@ -469,7 +510,7 @@ export default function App() {
               <span style={{ 
                 fontSize: '18px', 
                 fontWeight: 'bold', 
-                color: '#F1F5F9',
+                color: 'var(--text-primary)',
                 letterSpacing: '1px',
               }}>
                 SoloForce
@@ -477,7 +518,7 @@ export default function App() {
               <span style={{ 
                 fontSize: '10px', 
                 fontWeight: 400,
-                color: '#64748B',
+                color: 'var(--text-muted)',
                 letterSpacing: '2px',
               }}>
                 AI WORKFLOW ORCHESTRATOR
@@ -497,7 +538,7 @@ export default function App() {
           active={currentPage === '/topology'} 
           onClick={() => navigate('/topology')}
         >
-          团队拓扑
+          命令链路
         </NavLink>
         <NavLink 
           active={currentPage === '/meeting'} 
@@ -524,16 +565,42 @@ export default function App() {
           任务中心
         </NavLink>
         
+        {/* 主题切换按钮 */}
+        <button
+          onClick={() => {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('sf-theme', newTheme);
+            const btn = document.getElementById('theme-toggle');
+            if (btn) btn.textContent = newTheme === 'light' ? '🌙' : '☀️';
+          }}
+          id="theme-toggle"
+          style={{
+            marginLeft: 'auto',
+            padding: '8px 12px',
+            background: 'rgba(148, 163, 184, 0.1)',
+            border: '1px solid var(--border-default)',
+            borderRadius: '10px',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+        >
+          ☀️
+        </button>
+
         {/* 设置按钮 */}
         <button
           onClick={() => navigate('/settings')}
           style={{
-            marginLeft: 'auto',
+            marginLeft: '12px',
             padding: '8px 16px',
-            background: 'linear-gradient(135deg, rgba(148, 163, 184, 0.2) 0%, rgba(100, 116, 139, 0.1) 100%)',
-            border: '1px solid rgba(148, 163, 184, 0.3)',
+            background: 'rgba(148, 163, 184, 0.1)',
+            border: '1px solid var(--border-default)',
             borderRadius: '10px',
-            color: '#E2E8F0',
+            color: 'var(--text-primary)',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: 500,
@@ -542,7 +609,7 @@ export default function App() {
             gap: '6px',
           }}
         >
-          设置
+          ⚙️
         </button>
       </div>
 
@@ -571,13 +638,13 @@ function NavLink({ active, onClick, children }: { active: boolean; onClick: () =
         padding: '10px 18px',
         fontSize: '14px',
         fontWeight: active ? 600 : 400,
-        color: active ? '#06B6D4' : '#94A3B8',
-        background: active ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+        color: active ? 'var(--accent)' : 'var(--text-secondary)',
+        background: active ? 'var(--accent-muted)' : 'transparent',
         borderRadius: '10px',
         cursor: 'pointer',
         marginRight: '12px',
         transition: 'all 0.2s ease',
-        border: active ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid transparent',
+        border: active ? '1px solid var(--accent-border)' : '1px solid transparent',
       }}
     >
       {children}

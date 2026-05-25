@@ -66,6 +66,9 @@ export interface Employee {
   // 职责描述
   responsibilities?: string[];
   
+  // 性格标签（用于协商会议中的发言风格）
+  personalities?: string[];
+  
   // 统计信息
   stats?: {
     tasksCompleted: number;

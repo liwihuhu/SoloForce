@@ -5,7 +5,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5300,  // 使用5300端口
+    port: 5300,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5301',
+        changeOrigin: true,
+      },
+    },
   },
   resolve: {
     alias: {

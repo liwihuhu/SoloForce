@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/yourusername/SoloForce">
-    <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version"/>
+    <img src="https://img.shields.io/badge/version-2.1.0-blue" alt="Version"/>
   </a>
   <a href="https://github.com/yourusername/SoloForce/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License"/>
@@ -27,6 +27,49 @@
     <img src="https://img.shields.io/badge/Three.js-r150-rosa" alt="Three.js"/>
   </a>
 </p>
+
+---
+
+## 🆕 v2.1 更新说明（2026年5月）
+
+> 本次更新主要优化了系统稳定性、修复了多个 Bug，并新增了 **OpenClaw / LLM 双模式**支持，以及 **深浅模式切换**等功能。
+
+### 🔧 Bug 修复
+- 会议室协商模式发言动画逻辑修复
+- 会议总结生成逻辑增强，支持降级处理
+- 任务分发 JSON 解析容错能力提升
+- 修复了部分场景下 UI 组件状态异常的问题
+
+### ✨ 新增功能
+
+#### 🤖 双 AI 模式支持
+会议室和命令链路现在支持切换 AI 执行模式：
+- **OpenClaw 模式** — 使用 OpenClaw Agent 进行对话和任务分发
+- **LLM 模式** — 直接调用 SiliconFlow API（硅基流动）
+
+切换按钮位于各功能模块的输入区域右侧。
+
+#### 🌓 深浅模式切换
+- 点击左上角 Logo 区域可切换深/浅色模式
+- 深色模式：科技感十足的深蓝色调
+- 浅色模式：清新明亮的浅色系
+
+#### 📊 会议总结增强
+- 会议结束时自动生成会议总结
+- 支持 JSON 格式错误自动修复和降级处理
+- 总结内容展示更加清晰
+
+### 🔄 功能优化
+- 命令链路模块重命名为「命令链路」（原「团队拓扑」）
+- 任务分发支持更灵活的 AI 模式切换
+- UI 交互细节优化，操作更流畅
+
+### 📝 更新日志
+
+| 版本 | 日期 | 说明 |
+|------|------|------|
+| v2.1.0 | 2026-05-22 | 双 AI 模式 + 深浅模式 + Bug 修复 |
+| v2.0.0 | 2026-04 | 数字孪生公司地图 + AI 会议室 + 多行业模板 |
 
 ---
 
@@ -294,11 +337,6 @@ OPENCLAW_TOKEN=your_openclaw_token
 
 ## 🔮 未来规划
 
-
-### v2.1 - 智能进化
-- [ ] AI 员工自主学习优化
-- [ ] 任务执行历史智能分析
-- [ ] 自动建议最优工作流程
 
 ### v2.2 - 生态扩展
 - [ ] 支持更多 AI 平台接入

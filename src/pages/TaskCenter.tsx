@@ -100,14 +100,14 @@ export default function TaskCenter() {
   };
 
   const cardStyle: React.CSSProperties = {
-    background: '#1E293B',
+    background: 'var(--bg-secondary)',
     borderRadius: '12px',
     padding: '20px',
     border: '1px solid #334155',
   };
 
   const statCardStyle: React.CSSProperties = {
-    background: '#1E293B',
+    background: 'var(--bg-secondary)',
     borderRadius: '12px',
     padding: '20px',
     border: '1px solid #334155',
@@ -116,7 +116,7 @@ export default function TaskCenter() {
   };
 
   return (
-    <div style={{ padding: '24px', height: '100%', overflow: 'auto', background: '#0F172A' }}>
+    <div style={{ padding: '24px', height: '100%', overflow: 'auto', background: 'var(--bg-primary)' }}>
       {/* 核心指标卡片 */}
       {stats && (
         <div style={{ marginBottom: '24px' }}>
@@ -126,20 +126,20 @@ export default function TaskCenter() {
             gap: '16px',
           }}>
             <div style={statCardStyle}>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '8px' }}>员工数量</div>
-              <div style={{ fontSize: '32px', fontWeight: '600', color: '#F1F5F9' }}>{stats.employeeCount}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>员工数量</div>
+              <div style={{ fontSize: '32px', fontWeight: '600', color: 'var(--text-primary)' }}>{stats.employeeCount}</div>
             </div>
             <div style={statCardStyle}>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '8px' }}>团队数量</div>
-              <div style={{ fontSize: '32px', fontWeight: '600', color: '#F1F5F9' }}>{stats.teamCount}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>团队数量</div>
+              <div style={{ fontSize: '32px', fontWeight: '600', color: 'var(--text-primary)' }}>{stats.teamCount}</div>
             </div>
             <div style={statCardStyle}>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '8px' }}>任务总数</div>
-              <div style={{ fontSize: '32px', fontWeight: '600', color: '#F1F5F9' }}>{stats.total}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>任务总数</div>
+              <div style={{ fontSize: '32px', fontWeight: '600', color: 'var(--text-primary)' }}>{stats.total}</div>
             </div>
             <div style={statCardStyle}>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '8px' }}>成功率</div>
-              <div style={{ fontSize: '32px', fontWeight: '600', color: '#10B981' }}>{stats.successRate}%</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>成功率</div>
+              <div style={{ fontSize: '32px', fontWeight: '600', color: 'var(--success)' }}>{stats.successRate}%</div>
             </div>
           </div>
 
@@ -151,20 +151,20 @@ export default function TaskCenter() {
             marginTop: '16px'
           }}>
             <div style={{ ...statCardStyle, borderLeft: '3px solid #10B981' }}>
-              <div style={{ fontSize: '24px', fontWeight: '600', color: '#10B981' }}>{stats.completed}</div>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginTop: '4px' }}>已完成</div>
+              <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--success)' }}>{stats.completed}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>已完成</div>
             </div>
             <div style={{ ...statCardStyle, borderLeft: '3px solid #EF4444' }}>
-              <div style={{ fontSize: '24px', fontWeight: '600', color: '#EF4444' }}>{stats.failed}</div>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginTop: '4px' }}>失败</div>
+              <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--danger)' }}>{stats.failed}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>失败</div>
             </div>
             <div style={{ ...statCardStyle, borderLeft: '3px solid #3B82F6' }}>
-              <div style={{ fontSize: '24px', fontWeight: '600', color: '#3B82F6' }}>{stats.running}</div>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginTop: '4px' }}>进行中</div>
+              <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--blue)' }}>{stats.running}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>进行中</div>
             </div>
             <div style={{ ...statCardStyle, borderLeft: '3px solid #F59E0B' }}>
-              <div style={{ fontSize: '24px', fontWeight: '600', color: '#F59E0B' }}>{stats.pending}</div>
-              <div style={{ fontSize: '13px', color: '#94A3B8', marginTop: '4px' }}>等待中</div>
+              <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--warning)' }}>{stats.pending}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>等待中</div>
             </div>
           </div>
         </div>
@@ -180,19 +180,19 @@ export default function TaskCenter() {
         }}>
           {/* 团队任务分布 */}
           <div style={cardStyle}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#F1F5F9', margin: '0 0 16px 0' }}>团队任务分布</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', margin: '0 0 16px 0' }}>团队任务分布</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {Object.entries(stats.teamStats).slice(0, 5).map(([team, data]) => {
                 const successRate = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
                 return (
                   <div key={team} style={{ 
-                    background: '#0F172A', 
+                    background: 'var(--bg-primary)', 
                     borderRadius: '8px', 
                     padding: '12px',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '14px', color: '#F1F5F9' }}>{team}</span>
-                      <span style={{ fontSize: '14px', color: '#94A3B8' }}>{data.total} 任务</span>
+                      <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{team}</span>
+                      <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{data.total} 任务</span>
                     </div>
                     <div style={{ height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
                       <div style={{ 
@@ -203,14 +203,14 @@ export default function TaskCenter() {
                       }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '12px' }}>
-                      <span style={{ color: '#10B981' }}>完成 {data.completed}</span>
-                      <span style={{ color: '#EF4444' }}>失败 {data.failed}</span>
+                      <span style={{ color: 'var(--success)' }}>完成 {data.completed}</span>
+                      <span style={{ color: 'var(--danger)' }}>失败 {data.failed}</span>
                     </div>
                   </div>
                 );
               })}
               {Object.keys(stats.teamStats).length === 0 && (
-                <div style={{ textAlign: 'center', color: '#64748B', padding: '20px' }}>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
                   暂无数据
                 </div>
               )}
@@ -219,7 +219,7 @@ export default function TaskCenter() {
 
           {/* 最近7天趋势 */}
           <div style={cardStyle}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#F1F5F9', margin: '0 0 16px 0' }}>最近7天趋势</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', margin: '0 0 16px 0' }}>最近7天趋势</h3>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px' }}>
               {Object.entries(stats.dateStats).map(([date, data]) => {
                 const total = data.completed + data.failed;
@@ -238,7 +238,7 @@ export default function TaskCenter() {
                         <div style={{ width: '100%', height: '2px', background: '#334155', borderRadius: '2px' }} />
                       ) : null}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#64748B', marginTop: '8px' }}>{date.slice(5)}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>{date.slice(5)}</div>
                   </div>
                 );
               })}
@@ -246,11 +246,11 @@ export default function TaskCenter() {
             <div style={{ display: 'flex', gap: '16px', marginTop: '12px', justifyContent: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ width: '12px', height: '12px', background: '#3B82F6', borderRadius: '2px' }} />
-                <span style={{ fontSize: '12px', color: '#94A3B8' }}>完成</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>完成</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ width: '12px', height: '12px', background: '#EF4444', borderRadius: '2px' }} />
-                <span style={{ fontSize: '12px', color: '#94A3B8' }}>失败</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>失败</span>
               </div>
             </div>
           </div>
@@ -259,37 +259,37 @@ export default function TaskCenter() {
 
       {/* 任务历史 */}
       <div>
-        <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#F1F5F9', margin: '0 0 16px 0' }}>任务历史</h3>
+        <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', margin: '0 0 16px 0' }}>任务历史</h3>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
             加载中...
           </div>
         ) : tasks.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#64748B', ...cardStyle }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', ...cardStyle }}>
             暂无任务记录
           </div>
         ) : (
           <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#0F172A' }}>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#64748B' }}>任务</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#64748B' }}>团队</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#64748B' }}>状态</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#64748B' }}>耗时</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#64748B' }}>时间</th>
+                <tr style={{ background: 'var(--bg-primary)' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>任务</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>团队</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>状态</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>耗时</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>时间</th>
                 </tr>
               </thead>
               <tbody>
                 {tasks.map((task, index) => (
                   <tr key={task.id} style={{ 
                     borderTop: '1px solid #334155',
-                    background: index % 2 === 0 ? 'transparent' : '#0F172A',
+                    background: index % 2 === 0 ? 'transparent' : 'var(--bg-primary)',
                   }}>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', color: '#F1F5F9', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-primary)', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {task.task}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', color: '#94A3B8' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       {task.teamName || '-'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
@@ -303,10 +303,10 @@ export default function TaskCenter() {
                         {getStatusText(task.status)}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', color: '#94A3B8' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       {formatDuration(task.duration)}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: '13px', color: '#94A3B8' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       {formatTime(task.startTime)}
                     </td>
                   </tr>

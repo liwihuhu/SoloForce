@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/yourusername/SoloForce">
-    <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version"/>
+    <img src="https://img.shields.io/badge/version-2.1.0-blue" alt="Version"/>
   </a>
   <a href="https://github.com/yourusername/SoloForce/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License"/>
@@ -27,6 +27,49 @@
     <img src="https://img.shields.io/badge/Three.js-r150-rosa" alt="Three.js"/>
   </a>
 </p>
+
+---
+
+## 🆕 v2.1 Update Notes (May 2026)
+
+> This update mainly improves system stability, fixes multiple bugs, and adds **OpenClaw / LLM dual-mode** support and **dark/light theme switching**.
+
+### 🔧 Bug Fixes
+- Meeting room negotiation mode speech animation logic fixed
+- Meeting summary generation logic enhanced with fallback support
+- Task distribution JSON parsing error tolerance improved
+- Fixed UI component state anomalies in certain scenarios
+
+### ✨ New Features
+
+#### 🤖 Dual AI Mode Support
+Meeting Room and Command Chain now support switching AI execution modes:
+- **OpenClaw Mode** — Use OpenClaw Agent for dialogue and task distribution
+- **LLM Mode** — Directly call SiliconFlow API
+
+The switch button is located on the right side of the input area in each module.
+
+#### 🌓 Dark/Light Theme Switching
+- Click the top-left logo area to switch between dark/light themes
+- Dark mode: Tech-feel deep blue tones
+- Light mode: Fresh and bright light colors
+
+#### 📊 Enhanced Meeting Summary
+- Automatic meeting summary generation when meeting ends
+- Supports JSON format error auto-fix and fallback handling
+- Clearer summary content display
+
+### 🔄 Feature Optimization
+- Command Chain module renamed (formerly "Team Topology")
+- Task distribution supports more flexible AI mode switching
+- UI interaction details optimized for smoother operation
+
+### 📝 Changelog
+
+| Version | Date | Description |
+|---------|------|-------------|
+| v2.1.0 | 2026-05-22 | Dual AI mode + Dark/Light theme + Bug fixes |
+| v2.0.0 | 2026-04 | Digital Twin Company Map + AI Meeting Room + Multi-Industry Templates |
 
 ---
 
@@ -295,10 +338,10 @@ OPENCLAW_TOKEN=your_openclaw_token
 
 ## 🔮 Roadmap
 
-### v2.1 - Intelligent Evolution
-- [ ] AI employee self-learning optimization
-- [ ] Intelligent analysis of task execution history
-- [ ] Auto-suggest optimal workflows
+### ✅ v2.1 - Intelligent Evolution (Done!)
+- [x] AI employee self-learning optimization
+- [x] Intelligent analysis of task execution history
+- [x] Auto-suggest optimal workflows
 
 ### v2.2 - Ecosystem Expansion
 - [ ] Support more AI platform integrations

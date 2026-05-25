@@ -1,9 +1,19 @@
-// 会议室页面 - 共享黑板驱动协商版
-// 核心：Agent 读取黑板 → 生成回应 → 写入黑板 → UI实时展示
+// 会议室页面 - 协商版（复用 ODW 协商服务）
+// UI 适配 SF 风格，逻辑复用 ODW
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTopologyStore } from '../store';
-import { EMPLOYEE_TYPE_CONFIG } from '../types';
+import type { LLMConfig } from './Settings';
+
+const API_BASE = '/api';
+
+async function fetchJson(url: string, options?: RequestInit) {
+  const res = await fetch(url, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || '请求失败');
+  return data;
+}
 
 interface Message {
   id: string;
@@ -15,7 +25,7 @@ interface Message {
   timestamp: string;
   isAI?: boolean;
   isUser?: boolean;
-  isArbitrator?: boolean;
+  isSystem?: boolean;
 }
 
 interface BlackBoardItem {
@@ -25,1358 +35,783 @@ interface BlackBoardItem {
   authorType: string;
   type: 'opinion' | 'question' | 'decision' | 'pending' | 'summary';
   content: string;
-  targetId?: string;      // 回应谁
-  targetName?: string;   // 回应谁的名字
   timestamp: string;
 }
 
-// 共享黑板驱动的协商引擎
-class BlackboardNegotiationEngine {
-  private employees: any[];
-  private topic: string;
-  private blackboard: BlackBoardItem[];
-  private onBlackboardUpdate: (items: BlackBoardItem[]) => void;
-  private onMessage: (msg: Message) => void;
-  private onTypingChange: (employeeId: string | null) => void;
-  private isRunning: boolean = false;
-  private currentSpeakerIndex: number = 0;
-  private roundCount: number = 0;
-  private maxRounds: number = 2;  // 2轮讨论后进入仲裁环节
-  private API_BASE = 'http://localhost:5301';
-  private lastUserContent: string = '';  // 用户最新发言（权重最高）
-
-  constructor(
-    employees: any[],
-    topic: string,
-    blackboard: BlackBoardItem[],
-    onBlackboardUpdate: (items: BlackBoardItem[]) => void,
-    onMessage: (msg: Message) => void,
-    onTypingChange: (employeeId: string | null) => void
-  ) {
-    this.employees = employees.filter(e => e.type !== 'superadmin' && e.type !== 'executor');
-    this.topic = topic;
-    this.blackboard = [...blackboard];
-    this.onBlackboardUpdate = onBlackboardUpdate;
-    this.onMessage = onMessage;
-    this.onTypingChange = onTypingChange;
-  }
-
-  // 调用LLM生成发言
-  private async callLLM(employee: any): Promise<{ content: string; type: BlackBoardItem['type']; targetId?: string; targetName?: string }> {
-    try {
-      const response = await fetch(`${this.API_BASE}/api/negotiate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          speakerId: employee.id,
-          speakerName: employee.name,
-          speakerType: employee.type,
-          expertise: employee.expertise || [],
-          topic: this.topic,
-          blackboard: this.blackboard.map(b => ({
-            authorName: b.authorName,
-            authorType: b.authorType,
-            type: b.type,
-            content: b.content,
-          })),
-          userPriorityContent: this.lastUserContent || undefined,  // 用户最新发言权重最高
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success && data.data.content) {
-        return {
-          content: data.data.content,
-          type: 'opinion',
-        };
-      }
-      throw new Error('LLM返回无效');
-    } catch (error) {
-      console.error('LLM调用失败，使用备用内容:', error);
-      // 备用内容
-      const fallbacks = [
-        '我认为需要综合考虑各方面因素，制定一个可行的方案',
-        '从我的专业角度，这个方向是可行的',
-        '建议先做一个小规模试点，验证可行性',
-        '需要更多数据支撑决策',
-      ];
-      return {
-        content: fallbacks[Math.floor(Math.random() * fallbacks.length)],
-        type: 'opinion',
-      };
-    }
-  }
-
-  // 开始协商
-  async start() {
-    if (this.employees.length === 0) return;
-    
-    this.isRunning = true;
-    this.currentSpeakerIndex = 0;
-    this.roundCount = 0;
-
-    // 添加系统消息：议题发布
-    this.onMessage({
-      id: `sys-${Date.now()}`,
-      senderId: 'system',
-      senderName: '系统',
-      senderAvatar: '🤖',
-      senderType: 'system',
-      content: `📢 议题发布：「${this.topic}」`,
-      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-    });
-
-    // 添加议题到黑板
-    this.addToBlackboard({
-      authorId: 'system',
-      authorName: '系统',
-      authorType: 'system',
-      type: 'opinion',
-      content: `议题：${this.topic}`,
-    });
-
-    // 开始讨论轮次
-    await this.runDiscussion();
-  }
-
-  private async runDiscussion() {
-    while (this.isRunning && this.roundCount < this.maxRounds) {
-      // 每人发言一次
-      for (let i = 0; i < this.employees.length && this.isRunning; i++) {
-        await this.delay(3000 + Math.random() * 2000); // LLM需要更长时间
-        if (!this.isRunning) break;
-
-        const employee = this.employees[i];
-        
-        // 调用LLM生成（显示打字动画）
-        this.onTypingChange(employee.id);
-        const { content, type, targetId, targetName } = await this.callLLM(employee);
-        this.onTypingChange(null);  // 清除打字动画
-
-        // 添加到黑板
-        this.addToBlackboard({
-          authorId: employee.id,
-          authorName: employee.name,
-          authorType: employee.type,
-          type,
-          content,
-          targetId,
-          targetName,
-        });
-
-        // 发送消息
-        this.onMessage({
-          id: `msg-${Date.now()}`,
-          senderId: employee.id,
-          senderName: employee.name,
-          senderAvatar: employee.avatar,
-          senderType: employee.type,
-          content,
-          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-          isAI: true,
-        });
-      }
-
-      this.roundCount++;
-      
-      if (this.roundCount < this.maxRounds && this.isRunning) {
-        // 回合结束时先总结，再进行下一轮
-        await this.delay(1000);
-        
-        // 调用LLM总结黑板
-        const summary = await this.summarizeBlackboard();
-        
-        // 发送总结消息
-        if (summary) {
-          this.onMessage({
-            id: `sum-${Date.now()}`,
-            senderId: 'system',
-            senderName: '系统',
-            senderAvatar: '🤖',
-            senderType: 'system',
-            content: `📋 本轮总结：\n${summary}`,
-            timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-          });
-        }
-        
-        await this.delay(1500);
-        
-        // 系统提示下一轮开始
-        this.onMessage({
-          id: `sys-${Date.now()}`,
-          senderId: 'system',
-          senderName: '系统',
-          senderAvatar: '🤖',
-          senderType: 'system',
-          content: `🔄 第${this.roundCount + 1}轮讨论开始（基于总结展开）`,
-          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        });
-      }
-    }
-
-    // 讨论结束
-    if (this.isRunning) {
-      // 在仲裁者仲裁之前，先总结所有讨论
-      await this.delay(1000);
-      const finalSummary = await this.summarizeBlackboard();
-      
-      if (finalSummary) {
-        this.onMessage({
-          id: `final-sum-${Date.now()}`,
-          senderId: 'system',
-          senderName: '系统',
-          senderAvatar: '🤖',
-          senderType: 'system',
-          content: `📋 全部讨论总结：\n${finalSummary}`,
-          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        });
-      }
-      
-      this.addToBlackboard({
-        authorId: 'system',
-        authorName: '系统',
-        authorType: 'system',
-        type: 'decision',
-        content: `讨论完成，共${this.roundCount}轮，产生${this.blackboard.filter(b => b.authorId !== 'system').length}条观点`,
-      });
-
-      this.onMessage({
-        id: `sys-${Date.now()}`,
-        senderId: 'system',
-        senderName: '系统',
-        senderAvatar: '🤖',
-        senderType: 'system',
-        content: `⚖️ 请仲裁者基于以上总结做出决策`,
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      });
-    }
-  }
-
-  private addToBlackboard(item: Omit<BlackBoardItem, 'id' | 'timestamp'>): BlackBoardItem {
-    const newItem: BlackBoardItem = {
-      ...item,
-      id: `bb-${Date.now()}-${Math.random()}`,
-      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-    };
-    this.blackboard.push(newItem);
-    this.onBlackboardUpdate([...this.blackboard]);
-    return newItem;
-  }
-
-  stop() {
-    this.isRunning = false;
-  }
-
-  // 用户发言后，添加到黑板（同时记录为最高优先级）
-  userSpeak(content: string) {
-    this.lastUserContent = content;  // 记录用户最新发言
-    this.addToBlackboard({
-      authorId: 'user',
-      authorName: '仲裁者（我）',
-      authorType: 'user',
-      type: content.startsWith('决定') || content.startsWith('✅') ? 'decision' : 'opinion',
-      content,
-    });
-  }
-
-  // 获取用户最新发言
-  getLastUserContent(): string {
-    return this.lastUserContent;
-  }
-
-  // 用户添加问题
-  userAddQuestion(content: string) {
-    this.addToBlackboard({
-      authorId: 'user',
-      authorName: '仲裁者（我）',
-      authorType: 'user',
-      type: 'question',
-      content,
-    });
-  }
-
-  // 用户添加待处理
-  userAddPending(content: string) {
-    this.addToBlackboard({
-      authorId: 'user',
-      authorName: '仲裁者（我）',
-      authorType: 'user',
-      type: 'pending',
-      content,
-    });
-  }
-
-  // 总结黑板内容（调用LLM整理成条例）
-  async summarizeBlackboard(): Promise<string> {
-    if (this.blackboard.length === 0) return '';
-
-    try {
-      const response = await fetch(`${this.API_BASE}/api/summarize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: this.topic,
-          blackboard: this.blackboard.map(b => ({
-            authorName: b.authorName,
-            authorType: b.authorType,
-            type: b.type,
-            content: b.content,
-          })),
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success && data.data.content) {
-        // 添加总结到黑板
-        this.addToBlackboard({
-          authorId: 'system',
-          authorName: '系统',
-          authorType: 'system',
-          type: 'summary',
-          content: data.data.content,
-        });
-        return data.data.content;
-      }
-      throw new Error('总结API返回无效');
-    } catch (error) {
-      console.error('总结黑板失败:', error);
-      return '';
-    }
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-}
-
+// ========== 主组件 ==========
 export default function MeetingRoom() {
-  const { employees, teams, currentTeamId, switchTeam } = useTopologyStore();
-  
+  const { employees, teams, currentTeamId, switchTeam, aiMode, setAIMode } = useTopologyStore();
+  const queryClient = useQueryClient();
+
   // 状态
-  const [meetingTitle, setMeetingTitle] = useState('');
-  const [isMeetingActive, setIsMeetingActive] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [blackboard, setBlackboard] = useState<BlackBoardItem[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [topicInput, setTopicInput] = useState('');
-  const [isAutoSpeak, setIsAutoSpeak] = useState(true);
-  const [bbInputText, setBbInputText] = useState('');
-  const [typingEmployeeId, setTypingEmployeeId] = useState<string | null>(null);
-  
+  const [meetingId, setMeetingId] = useState('');
+  const [topic, setTopic] = useState('');
+  const [status, setStatus] = useState<'idle' | 'active' | 'paused' | 'finished' | 'waiting_next_round'>('idle');
+  const [currentRound, setCurrentRound] = useState(0);
+  const [userInput, setUserInput] = useState('');
+  const [showAtPicker, setShowAtPicker] = useState(false); // @ 提及选择器
+  const [atPickerPosition, setAtPickerPosition] = useState({ x: 0, y: 0 });
+  const [mentionedIds, setMentionedIds] = useState<string[]>([]); // 当前已 @ 的人
+  const [autoRound, setAutoRound] = useState(true); // 自动轮次开关
+  const [pendingSpeakerId, setPendingSpeakerId] = useState<string | null>(null);
+  // 当前正在思考/生成中的参与者（mutation触发时设，新消息到达时清）
+  const [currentThinkingId, setCurrentThinkingId] = useState<string | null>(null);
+  const [dotFrame, setDotFrame] = useState(0);
+  const [showBlackboard, setShowBlackboard] = useState(true);
+  const [detailEmployee, setDetailEmployee] = useState<(typeof participants)[0] | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false); // 正在生成会议总结
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const bbListRef = useRef<HTMLDivElement>(null);
-  const negotiationEngineRef = useRef<BlackboardNegotiationEngine | null>(null);
+  // mutation 开始时的消息数量，用来判断"真正的新消息"是否已到达
+  const mutationStartMsgCount = useRef(0);
+  // mutation 触发时记录目标发言者，等其回复到达才清除动画
+  const thinkingTargetId = useRef<string | null>(null);
 
   // 当前团队
   const currentTeam = teams.find(t => t.id === currentTeamId);
-  
+
   // 参会人员（当前团队的成员，排除总裁和执行官）
-  const meetingParticipants = currentTeam 
-    ? employees.filter(e => 
-        currentTeam.memberIds.includes(e.id) && 
-        e.type !== 'superadmin' && 
+  const participants = currentTeam
+    ? employees.filter(e =>
+        currentTeam.memberIds.includes(e.id) &&
+        e.type !== 'superadmin' &&
         e.type !== 'executor'
-      )
+      ).map(e => ({
+        id: e.id,
+        name: e.name,
+        role: e.type,
+        roleName: e.roleName || e.type,
+        avatar: e.avatar,
+        expertise: e.expertise || [],
+        personalities: e.personalities || [],
+      }))
     : [];
 
-  // 自动滚动消息
+
+  // 当前团队
+
+  // 轮询协商状态
+  const { data: meetingStatus } = useQuery({
+    queryKey: ['meeting-status', meetingId],
+    queryFn: () => meetingId ? fetchJson(`${API_BASE}/negotiation/${meetingId}/status`) : null,
+    enabled: !!meetingId && status !== 'idle',
+    refetchInterval: 3000, // 3秒轮询
+  });
+
+  // 更新状态从 meetingStatus
+  useEffect(() => {
+    if (meetingStatus?.data) {
+      const d = meetingStatus.data;
+      setStatus(d.status || 'idle');
+      setCurrentRound(d.currentRound || 0);
+    }
+  }, [meetingStatus]);
+
+  // 自动滚动
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [meetingStatus?.data?.messages]);
 
-  // 黑板自动滚动到底部
+  // 等待动画
   useEffect(() => {
-    if (bbListRef.current) {
-      bbListRef.current.scrollTop = bbListRef.current.scrollHeight;
-    }
-  }, [blackboard]);
+    if (!pendingSpeakerId) return;
+    const interval = setInterval(() => setDotFrame(f => (f + 1) % 3), 300);
+    return () => clearInterval(interval);
+  }, [pendingSpeakerId]);
 
-  // 开始会议
-  const startMeeting = () => {
-    if (!topicInput.trim()) {
-      alert('请输入会议议题');
+  // 检测正在等待的参与者
+  useEffect(() => {
+    if (status === 'idle' || status === 'finished') {
+      setPendingSpeakerId(null);
+      setCurrentThinkingId(null);
       return;
     }
-    if (!currentTeamId) {
-      alert('请先选择团队');
-      return;
-    }
-    setMeetingTitle(topicInput);
-    setIsMeetingActive(true);
-    setMessages([]);
-    setBlackboard([]);
-    
-    // 启动协商引擎
-    if (isAutoSpeak && meetingParticipants.length > 0) {
-      negotiationEngineRef.current = new BlackboardNegotiationEngine(
-        meetingParticipants,
-        topicInput,
-        [],
-        (items) => setBlackboard(items),
-        (msg) => setMessages(prev => [...prev, msg]),
-        (id) => setTypingEmployeeId(id)
-      );
-      negotiationEngineRef.current.start();
-    }
-  };
+    const msgs = meetingStatus?.data?.messages || [];
+    const newMsgArrived = msgs.length > mutationStartMsgCount.current;
 
-  // 停止协商
-  const stopNegotiation = () => {
-    if (negotiationEngineRef.current) {
-      negotiationEngineRef.current.stop();
-      negotiationEngineRef.current = null;
-    }
-  };
-
-  // 结束会议
-  const endMeeting = async () => {
-    if (confirm('确定要结束会议吗？')) {
-      stopNegotiation();
-      setIsMeetingActive(false);
-      setIsAutoSpeak(false);
-      
-      // 自动总结黑板
-      if (negotiationEngineRef.current && blackboard.length > 0) {
-        setMessages(prev => [...prev, {
-          id: `sum-start-${Date.now()}`,
-          senderId: 'system',
-          senderName: '系统',
-          senderAvatar: '🤖',
-          senderType: 'system',
-          content: '📊 正在生成会议总结...',
-          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        }]);
-
-        const summary = await negotiationEngineRef.current.summarizeBlackboard();
-        if (summary) {
-          setMessages(prev => [...prev, {
-            id: `sum-${Date.now()}`,
-            senderId: 'system',
-            senderName: '系统',
-            senderAvatar: '🤖',
-            senderType: 'system',
-            content: `📋 会议总结：\n${summary}`,
-            timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-          }]);
-        }
+    // 新消息到达 → 检查是否来自"正在等待的发言者"
+    if (newMsgArrived && thinkingTargetId.current) {
+      const latestMsg = msgs[msgs.length - 1];
+      if (latestMsg?.senderId === thinkingTargetId.current) {
+        // 找到下一个发言者，继续显示思考动画
+        const idx = participants.findIndex(p => p.id === thinkingTargetId.current);
+        const nextIdx = (idx + 1) % participants.length;
+        thinkingTargetId.current = participants[nextIdx]?.id || null;
+        setCurrentThinkingId(thinkingTargetId.current);
       }
-      
-      const endMsg: Message = {
-        id: `end-${Date.now()}`,
-        senderId: 'system',
-        senderName: '系统',
-        senderAvatar: '🤖',
-        senderType: 'system',
-        content: `🏁 会议「${meetingTitle}」已结束`,
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages(prev => [...prev, endMsg]);
-    }
-  };
-
-  // 发送消息（仲裁者）
-  const sendMessage = () => {
-    if (!inputText.trim() || !isMeetingActive) return;
-
-    const userContent = inputText;
-
-    // 先暂停自动协商
-    if (isAutoSpeak) {
-      stopNegotiation();
-      setIsAutoSpeak(false);
     }
 
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      senderId: 'user',
-      senderName: '仲裁者（我）',
-      senderAvatar: '👤',
-      senderType: 'user',
-      content: userContent,
-      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      isUser: true,
-      isArbitrator: true,
-    };
-    setMessages(prev => [...prev, userMsg]);
-
-    // 添加到黑板
-    if (negotiationEngineRef.current) {
-      negotiationEngineRef.current.userSpeak(userContent);
-    } else {
-      setBlackboard(prev => [...prev, {
-        id: `bb-${Date.now()}`,
-        authorId: 'user',
-        authorName: '仲裁者（我）',
-        authorType: 'user',
-        type: userContent.startsWith('决定') || userContent.startsWith('✅') ? 'decision' : 'opinion',
-        content: userContent,
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      }]);
+    // pendingSpeakerId 用于 UI 高亮左边栏的参与者
+    // 优先用 currentThinkingId（mutation进行中），否则基于消息时间推导
+    if (currentThinkingId) {
+      setPendingSpeakerId(currentThinkingId);
+      return;
     }
 
-    setInputText('');
+    if (msgs.length === 0) { setPendingSpeakerId(null); return; }
+    const lastMsg = msgs[msgs.length - 1];
+    if (!lastMsg?.timestamp) { setPendingSpeakerId(null); return; }
 
-    // 自动恢复协商
-    setTimeout(() => {
-      resumeAutoSpeak();
-    }, 1000);
-  };
-
-  // 恢复自动协商
-  const resumeAutoSpeak = () => {
-    if (isMeetingActive && meetingParticipants.length > 0 && !negotiationEngineRef.current) {
-      negotiationEngineRef.current = new BlackboardNegotiationEngine(
-        meetingParticipants,
-        meetingTitle,
-        blackboard,
-        (items) => setBlackboard(items),
-        (msg) => setMessages(prev => [...prev, msg]),
-        (id) => setTypingEmployeeId(id)
-      );
-      negotiationEngineRef.current.start();
-      setIsAutoSpeak(true);
+    // 基于时间推算下一个发言者（fallback 逻辑）
+    const elapsed = Date.now() - new Date(lastMsg.timestamp).getTime();
+    if (lastMsg.isAI && elapsed < 10000 && lastMsg.senderId !== 'user' && lastMsg.senderId !== 'system') {
+      const idx = participants.findIndex(p => p.id === lastMsg.senderId);
+      const nextIdx = (idx + 1) % participants.length;
+      if (participants[nextIdx]) { setPendingSpeakerId(participants[nextIdx].id); return; }
     }
-  };
+    if (lastMsg.isUser && elapsed >= 2000 && elapsed < 8000) {
+      if (participants.length > 0) { setPendingSpeakerId(participants[0].id); return; }
+    }
 
-  // 导出会议
-  const exportMeeting = () => {
-    const exportData = {
-      meetingTitle,
-      exportTime: new Date().toLocaleString('zh-CN'),
-      team: currentTeam?.name || '未选择团队',
-      participants: meetingParticipants.map(p => p.name),
-      messageCount: messages.length,
-      blackboard,
-      content: messages.map(m => ({
-        sender: m.senderName,
-        content: m.content,
-        time: m.timestamp,
-        type: m.isArbitrator ? 'arbitrator' : m.isAI ? 'ai' : 'system',
-      })),
-    };
+    setPendingSpeakerId(null);
+  }, [meetingStatus, status, participants.map(p => p.id)]);
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `会议纪要_${meetingTitle}_${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // 获取类型配置
-  const getTypeConfig = (type: BlackBoardItem['type']) => {
-    const configs = {
-      opinion: { color: '#6B7280', bg: 'rgba(30, 41, 59, 0.6)', border: 'rgba(6, 182, 212, 0.2)', icon: '💬' },
-      question: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.3)', icon: '❓' },
-      decision: { color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.3)', icon: '✅' },
-      pending: { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.3)', icon: '⏳' },
-      summary: { color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.1)', border: 'rgba(139, 92, 246, 0.3)', icon: '📊' },
-    };
-    return configs[type] || configs.opinion;
-  };
-
-  // 获取角色配置
-  const getConfig = (type: string) => {
-    return EMPLOYEE_TYPE_CONFIG[type as keyof typeof EMPLOYEE_TYPE_CONFIG] || { color: '#6B7280' };
-  };
-
-  // 组件卸载时停止
+  // 自动下一轮
   useEffect(() => {
-    return () => stopNegotiation();
-  }, []);
+    if (status === 'waiting_next_round' && autoRound) {
+      const timer = setTimeout(() => nextRoundMutation.mutate(), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, autoRound]);
 
-  // 添加打字动画样式
-  useEffect(() => {
-    const styleId = 'meeting-typing-styles';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        @keyframes typingBounce {
-          0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
-          40% { transform: scale(1); opacity: 1; }
+  // ========== mutations ==========
+  const createMutation = useMutation({
+    mutationFn: async (firstMessage: string) => {
+      const mid = `meeting-${Date.now()}`;
+
+      // 如果是 LLM 模式，获取选中的配置
+      let llmConfig: LLMConfig | undefined;
+      if (aiMode === 'llm') {
+        const savedConfigs = localStorage.getItem('llm_configs');
+        const configs: LLMConfig[] = savedConfigs ? JSON.parse(savedConfigs) : [];
+        // 使用第一个启用且有 apiKey 的配置
+        llmConfig = configs.find(c => c.enabled && c.apiKey) || configs[0];
+      }
+
+      await fetchJson(`${API_BASE}/negotiation/create`, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          meetingId: mid, 
+          topic: firstMessage, 
+          participants, 
+          aiMode,
+          llmConfig,
+        }),
+      });
+      return { meetingId: mid, firstMessage };
+    },
+    onSuccess: (data) => {
+      setMeetingId(data.meetingId);
+      setTopic(data.firstMessage);
+      startMutation.mutate({ meetingId: data.meetingId, firstMessage: data.firstMessage });
+    },
+  });
+
+  const startMutation = useMutation({
+    mutationFn: ({ meetingId: mid, firstMessage }: { meetingId: string; firstMessage: string }) => {
+      fetchJson(`${API_BASE}/negotiation/${mid}/start`, { method: 'POST' });
+      if (firstMessage) fetchJson(`${API_BASE}/negotiation/${mid}/speak`, {
+        method: 'POST',
+        body: JSON.stringify({ content: firstMessage }),
+      });
+      return Promise.resolve();
+    },
+    onMutate: () => {
+      mutationStartMsgCount.current = (meetingStatus?.data?.messages || []).length;
+      // 第一轮：第一个参与者发言
+      if (participants.length > 0) {
+        const targetId = participants[0].id;
+        thinkingTargetId.current = targetId;
+        setCurrentThinkingId(targetId);
+      }
+    },
+    onSuccess: () => { setStatus('active'); setUserInput(''); queryClient.invalidateQueries({ queryKey: ['meeting-status', meetingId] }); },
+  });
+
+  const speakMutation = useMutation({
+    mutationFn: ({ content, mentioned }: { content: string; mentioned?: string[] }) =>
+      fetchJson(`${API_BASE}/negotiation/${meetingId}/speak`, {
+        method: 'POST',
+        body: JSON.stringify({ content, mentionedIds: mentioned }),
+      }),
+    onMutate: () => {
+      // 记录当前消息数量，用于判断新消息是否到达
+      mutationStartMsgCount.current = (meetingStatus?.data?.messages || []).length;
+      // 找到下一个发言者（round-robin），显示其思考动画
+      const msgs = meetingStatus?.data?.messages || [];
+      if (msgs.length > 0 && participants.length > 0) {
+        const lastMsg = msgs[msgs.length - 1];
+        const lastIdx = participants.findIndex(p => p.id === lastMsg?.senderId);
+        const nextIdx = lastIdx >= 0 ? (lastIdx + 1) % participants.length : 0;
+        const targetId = participants[nextIdx]?.id || null;
+        thinkingTargetId.current = targetId;
+        setCurrentThinkingId(targetId);
+      }
+    },
+    onSuccess: () => { setMentionedIds([]); queryClient.invalidateQueries({ queryKey: ['meeting-status', meetingId] }); },
+  });
+
+  const nextRoundMutation = useMutation({
+    mutationFn: () => fetchJson(`${API_BASE}/negotiation/${meetingId}/next-round`, { method: 'POST' }),
+    onSuccess: () => { setStatus('active'); queryClient.invalidateQueries({ queryKey: ['meeting-status', meetingId] }); },
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: () => {
+      setIsSummarizing(true); // 开始显示总结动画
+      return fetchJson(`${API_BASE}/negotiation/${meetingId}/stop`, { method: 'POST' });
+    },
+    onSuccess: () => {
+      setStatus('finished');
+      // 等待 summary 出现在 blackboard 中再关闭动画
+      let waitCount = 0;
+      const checkSummary = () => {
+        const currentBlackboard = meetingStatus?.data?.blackboard || [];
+        const summaryItem = currentBlackboard.find(item => item.type === 'summary');
+        if (summaryItem) {
+          queryClient.invalidateQueries({ queryKey: ['meeting-status', meetingId] });
+          setIsSummarizing(false);
+        } else if (waitCount < 30) {
+          // 每秒检查一次，最多等 30 秒
+          waitCount++;
+          setTimeout(checkSummary, 1000);
+        } else {
+          // 超时后也关闭动画
+          setIsSummarizing(false);
         }
-      `;
-      document.head.appendChild(style);
-    }
-    return () => {
-      const style = document.getElementById(styleId);
-      if (style) document.head.removeChild(style);
-    };
-  }, []);
+      };
+      checkSummary();
+    },
+    onError: () => {
+      setIsSummarizing(false);
+    },
+  });
 
+  const pauseMutation = useMutation({
+    mutationFn: () => fetchJson(`${API_BASE}/negotiation/${meetingId}/pause`, { method: 'POST' }),
+    onSuccess: () => {
+      setStatus('paused');
+      queryClient.invalidateQueries({ queryKey: ['meeting-status', meetingId] });
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: () => fetchJson(`${API_BASE}/negotiation/${meetingId}/resume`, { method: 'POST' }),
+    onSuccess: () => {
+      setStatus('active');
+      queryClient.invalidateQueries({ queryKey: ['meeting-status', meetingId] });
+    },
+  });
+
+  const handleSend = () => {
+    if (!userInput.trim()) return;
+    const text = userInput.trim();
+    if (!meetingId) {
+      createMutation.mutate(text);
+    } else if (status === 'idle') {
+      startMutation.mutate({ meetingId, firstMessage: text });
+    } else {
+      speakMutation.mutate({ content: text, mentioned: mentionedIds.length > 0 ? mentionedIds : undefined });
+    }
+    setUserInput('');
+  };
+
+  // 获取消息和黑板（类型标注避免隐式any）
+  const messages: Message[] = meetingStatus?.data?.messages || [];
+  const blackboard: BlackBoardItem[] = meetingStatus?.data?.blackboard || [];
+
+  // 等待动画显示
+  const pendingSpeaker = pendingSpeakerId ? participants.find(p => p.id === pendingSpeakerId) : null;
+
+  // ========== JSX return ==========
   return (
     <div style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)',
+      background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
     }}>
       {/* ========== 顶部导航栏 ========== */}
       <div style={{
         height: '56px',
-        background: 'rgba(15, 23, 42, 0.95)',
-        borderBottom: '1px solid rgba(6, 182, 212, 0.2)',
+        background: 'var(--bg-card)',
+        borderBottom: '1px solid var(--border-default)',
         display: 'flex',
         alignItems: 'center',
         padding: '0 20px',
         gap: '16px',
       }}>
-        <div style={{
-          fontSize: '16px',
-          fontWeight: 600,
-          color: '#F1F5F9',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
+        <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span>🏛️</span>
           <span>会议室</span>
         </div>
 
         <select
           value={currentTeamId || ''}
-          onChange={(e) => {
-            const team = teams.find(t => t.id === e.target.value);
-            if (team) switchTeam(team);
-          }}
-          disabled={isMeetingActive}
-          style={{
-            padding: '6px 12px',
-            background: 'rgba(30, 41, 59, 0.8)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
-            borderRadius: '8px',
-            fontSize: '13px',
-            color: '#F1F5F9',
-            cursor: isMeetingActive ? 'not-allowed' : 'pointer',
-            outline: 'none',
-            minWidth: '150px',
-          }}
+          onChange={(e) => { const team = teams.find(t => t.id === e.target.value); if (team) switchTeam(team); }}
+          disabled={!!meetingId && status !== 'idle'}
+          style={{ padding: '6px 12px', background: 'var(--bg-input)', border: '1px solid var(--accent-border)', borderRadius: '8px', fontSize: '13px', color: 'var(--text-primary)' }}
         >
-          <option value="" style={{ background: '#1E293B' }}>选择团队...</option>
-          {teams.map(team => (
-            <option key={team.id} value={team.id} style={{ background: '#1E293B' }}>
-              {team.name}
-            </option>
-          ))}
+          <option value="">选择团队</option>
+          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
 
-        {isMeetingActive && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 12px',
-            background: 'rgba(16, 185, 129, 0.15)',
-            borderRadius: '20px',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: '#10B981',
-              animation: 'pulse 2s infinite',
-            }} />
-            <span style={{ fontSize: '12px', color: '#10B981' }}>进行中</span>
+        <div style={{ flex: 1 }} />
+
+        {meetingId && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              {status === 'active' ? '🔵 进行中' : status === 'waiting_next_round' ? '⏸️ 等待下一轮' : status === 'finished' ? '🏁 已结束' : '⏳ 空闲'}
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>第 {currentRound} 轮</span>
           </div>
         )}
 
-        <button
-          onClick={exportMeeting}
-          disabled={messages.length === 0}
-          style={{
-            marginLeft: 'auto',
-            padding: '6px 14px',
-            background: messages.length > 0 ? 'rgba(139, 92, 246, 0.2)' : 'rgba(30, 41, 59, 0.5)',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
-            borderRadius: '8px',
-            color: messages.length > 0 ? '#A78BFA' : '#64748B',
-            fontSize: '13px',
-            cursor: messages.length > 0 ? 'pointer' : 'not-allowed',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          📥 导出
+        {status === 'active' && (
+          <button onClick={() => pauseMutation.mutate()} style={{ padding: '6px 12px', background: 'var(--warning-bg-strong)', border: '1px solid var(--warning)', borderRadius: '6px', color: 'var(--warning)', fontSize: '12px', cursor: 'pointer' }}>
+            ⏸ 暂停
+          </button>
+        )}
+
+        {status === 'paused' && (
+          <button onClick={() => resumeMutation.mutate()} style={{ padding: '6px 12px', background: 'var(--success-bg-strong)', border: '1px solid var(--success)', borderRadius: '6px', color: 'var(--success)', fontSize: '12px', cursor: 'pointer' }}>
+            ▶ 继续
+          </button>
+        )}
+
+        {status !== 'idle' && status !== 'finished' && (
+          <button onClick={() => stopMutation.mutate()} style={{ padding: '6px 12px', background: 'var(--danger-bg-strong)', border: '1px solid var(--danger)', borderRadius: '6px', color: 'var(--danger)', fontSize: '12px', cursor: 'pointer' }}>
+            ⏹ 结束
+          </button>
+        )}
+
+        <button onClick={() => setShowBlackboard(!showBlackboard)} style={{ padding: '6px 12px', background: 'var(--accent-muted)', border: '1px solid var(--accent-border)', borderRadius: '6px', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer' }}>
+          📋 黑板 {showBlackboard ? '隐藏' : '显示'}
         </button>
-      </div>
-
-      {/* ========== 会议控制栏 ========== */}
-      <div style={{
-        padding: '16px 20px',
-        background: 'rgba(15, 23, 42, 0.8)',
-        borderBottom: '1px solid rgba(6, 182, 212, 0.1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-      }}>
-        <input
-          type="text"
-          value={topicInput}
-          onChange={(e) => setTopicInput(e.target.value)}
-          disabled={isMeetingActive}
-          placeholder="输入会议议题..."
-          style={{
-            flex: 1,
-            maxWidth: '400px',
-            padding: '10px 16px',
-            background: isMeetingActive ? 'rgba(30, 41, 59, 0.5)' : 'rgba(30, 41, 59, 0.8)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
-            borderRadius: '10px',
-            fontSize: '14px',
-            color: '#F1F5F9',
-            outline: 'none',
-          }}
-        />
-
-        {!isMeetingActive ? (
-          <button
-            onClick={startMeeting}
-            disabled={!currentTeamId}
-            style={{
-              padding: '10px 20px',
-              background: currentTeamId 
-                ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                : 'rgba(30, 41, 59, 0.5)',
-              border: 'none',
-              borderRadius: '10px',
-              color: currentTeamId ? 'white' : '#64748B',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: currentTeamId ? 'pointer' : 'not-allowed',
-            }}
-          >
-            ▶️ 开始会议
-          </button>
-        ) : (
-          <button
-            onClick={endMeeting}
-            style={{
-              padding: '10px 20px',
-              background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
-              border: 'none',
-              borderRadius: '10px',
-              color: 'white',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            ⏹️ 结束会议
-          </button>
-        )}
-
-        {isMeetingActive && (
-          <div style={{ fontSize: '12px', color: '#64748B', marginLeft: '12px' }}>
-            参会: {meetingParticipants.length} 人
-          </div>
-        )}
       </div>
 
       {/* ========== 主内容区 ========== */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* ========== 左侧：协商区域 ========== */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          borderRight: '1px solid rgba(6, 182, 212, 0.2)',
-        }}>
-          <div style={{
-            padding: '12px 20px',
-            background: 'rgba(15, 23, 42, 0.6)',
-            borderBottom: '1px solid rgba(6, 182, 212, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#F1F5F9' }}>
-              💬 协商讨论
-            </span>
-            {meetingTitle && (
-              <span style={{
-                fontSize: '12px',
-                color: '#64748B',
-                padding: '2px 10px',
-                background: 'rgba(6, 182, 212, 0.1)',
-                borderRadius: '10px',
-              }}>
-                {meetingTitle}
-              </span>
-            )}
+        {/* 左侧：参与人列表 */}
+        <div style={{ width: '200px', background: 'var(--bg-card)', borderRight: '1px solid var(--border-default)', padding: '16px', overflowY: 'auto' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            参与人 ({participants.length})
           </div>
+          {participants.map(p => (
+            <div key={p.id} style={{ padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', marginBottom: '8px', borderLeft: `3px solid ${p.id === pendingSpeakerId ? 'var(--accent)' : 'transparent'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ fontSize: '20px' }}>
+                  {p.avatar?.startsWith('/') ? (
+                    <img src={p.avatar} alt={p.name} style={{ width: '24px', height: '24px', borderRadius: '4px' }} />
+                  ) : p.avatar}
+                </div>
+                <button
+                  onClick={() => setDetailEmployee(p)}
+                  style={{
+                    padding: '2px 6px', fontSize: '10px', background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-default)', borderRadius: '4px',
+                    color: 'var(--text-muted)', cursor: 'pointer',
+                  }}
+                  title="查看详情"
+                >
+                  &bull;&bull;&bull;
+                </button>
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>{p.name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{p.roleName}</div>
+            </div>
+          ))}
+          {participants.length === 0 && (
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '20px' }}>
+              请先选择团队
+            </div>
+          )}
+        </div>
 
+        {/* 中间：消息区域 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           {/* 消息列表 */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}>
-            {!isMeetingActive && messages.length === 0 ? (
-              <div style={{
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+            {messages.length === 0 && status === 'idle' && (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '60px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏛️</div>
+                <div style={{ fontSize: '16px' }}>选择团队，输入议题开始协商</div>
+              </div>
+            )}
+            
+            {messages.map((msg, i) => (
+              <div key={msg.id || i} style={{
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#64748B',
+                alignItems: msg.isUser || msg.isSystem ? 'flex-end' : 'flex-start',
+                marginBottom: '16px',
               }}>
-                <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.3 }}>💬</div>
-                <div style={{ fontSize: '16px', fontWeight: 500, color: '#94A3B8' }}>
-                  选择团队并输入议题开始会议
-                </div>
-                <div style={{ fontSize: '13px', marginTop: '8px' }}>
-                  数字员工将基于共享黑板进行协商
-                </div>
-              </div>
-            ) : (
-              messages.map(msg => {
-                const isSystem = msg.senderId === 'system';
-                const config = !isSystem && msg.senderType !== 'user' 
-                  ? getConfig(msg.senderType) 
-                  : null;
-                
-                if (isSystem) {
-                  return (
-                    <div key={msg.id} style={{ width: '100%', textAlign: 'center', padding: '8px' }}>
-                      <span style={{
-                        fontSize: '12px',
-                        color: msg.content.includes('结束') ? '#EF4444' : '#64748B',
-                        padding: '4px 12px',
-                        background: 'rgba(30, 41, 59, 0.6)',
-                        borderRadius: '10px',
-                      }}>
-                        {msg.content}
-                      </span>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={msg.id}
-                    style={{
-                      display: 'flex',
-                      gap: '12px',
-                      alignItems: 'flex-start',
-                      justifyContent: msg.isUser ? 'flex-end' : 'flex-start',
-                    }}
-                  >
-                    {!msg.isUser && (
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: '#1E293B',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: msg.isAI ? `2px solid ${config?.color || '#6B7280'}50` : 'none',
-                        flexShrink: 0,
-                      }}>
-                        {msg.senderAvatar && msg.senderAvatar.startsWith('/') ? (
-                          <img src={msg.senderAvatar} alt={msg.senderName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span style={{ fontSize: '18px' }}>{msg.senderAvatar}</span>
-                        )}
-                      </div>
-                    )}
-
-                    <div style={{ 
-                      maxWidth: '70%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: msg.isUser ? 'flex-end' : 'flex-start',
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '4px',
-                        flexDirection: msg.isUser ? 'row-reverse' : 'row',
-                      }}>
-                        <span style={{
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          color: msg.isArbitrator ? '#F59E0B' : (config?.color || '#94A3B8'),
-                        }}>
-                          {msg.senderName}
-                        </span>
-                        {msg.isAI && (
-                          <span style={{
-                            fontSize: '9px',
-                            padding: '1px 5px',
-                            background: `${config?.color || '#6B7280'}20`,
-                            color: config?.color || '#6B7280',
-                            borderRadius: '4px',
-                          }}>
-                            AI
-                          </span>
-                        )}
-                        {msg.isArbitrator && (
-                          <span style={{
-                            fontSize: '9px',
-                            padding: '1px 5px',
-                            background: 'rgba(245, 158, 11, 0.2)',
-                            color: '#F59E0B',
-                            borderRadius: '4px',
-                          }}>
-                            仲裁
-                          </span>
-                        )}
-                        <span style={{ fontSize: '10px', color: '#64748B' }}>
-                          {msg.timestamp}
-                        </span>
-                      </div>
-                      <div style={{
-                        padding: '12px 16px',
-                        background: msg.isArbitrator
-                          ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(234, 88, 12, 0.15) 100%)'
-                          : msg.isAI
-                          ? 'rgba(30, 41, 59, 0.8)'
-                          : 'rgba(6, 182, 212, 0.15)',
-                        borderRadius: '12px',
-                        borderTopLeftRadius: msg.isUser ? '12px' : '4px',
-                        borderTopRightRadius: msg.isUser ? '4px' : '12px',
-                        border: `1px solid ${msg.isArbitrator ? 'rgba(245, 158, 11, 0.3)' : msg.isAI ? 'rgba(6, 182, 212, 0.1)' : 'rgba(6, 182, 212, 0.3)'}`,
-                        fontSize: '14px',
-                        color: '#E2E8F0',
-                        lineHeight: 1.6,
-                      }}>
-                        {msg.content}
-                      </div>
-                    </div>
-
-                    {msg.isUser && (
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        <span style={{ fontSize: '18px' }}>👤</span>
-                      </div>
-                    )}
+                {msg.isSystem ? (
+                  <div style={{ padding: '8px 16px', background: 'var(--accent-bg)', borderRadius: '8px', fontSize: '13px', color: 'var(--accent)' }}>
+                    {msg.content}
                   </div>
-                );
-              })
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: msg.isUser ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: '8px', maxWidth: '80%' }}>
+                    <div style={{ fontSize: '28px' }}>
+                      {msg.senderAvatar?.startsWith('/') ? (
+                        <img src={msg.senderAvatar} alt={msg.senderName} style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
+                      ) : msg.senderAvatar}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', textAlign: msg.isUser ? 'right' : 'left' }}>
+                        {msg.senderName}
+                      </div>
+                      <div style={{
+                        padding: '10px 14px',
+                        background: msg.isUser ? 'var(--accent-hover)' : 'var(--bg-card)',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        color: 'var(--text-primary)',
+                        borderBottomLeftRadius: msg.isUser ? '12px' : '4px',
+                        borderBottomRightRadius: msg.isUser ? '4px' : '12px',
+                      }}>
+                        {msg.content}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', textAlign: msg.isUser ? 'right' : 'left' }}>
+                        {msg.timestamp}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* 等待动画 */}
+            {pendingSpeaker && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '24px' }}>
+                  {pendingSpeaker.avatar?.startsWith('/') ? (
+                    <img src={pendingSpeaker.avatar} alt={pendingSpeaker.name} style={{ width: '28px', height: '28px', borderRadius: '6px' }} />
+                  ) : pendingSpeaker.avatar}
+                </span>
+                <span>{pendingSpeaker.name} 发言中</span>
+                <span style={{ display: 'flex', gap: '4px' }}>
+                  <span style={{ opacity: dotFrame === 0 ? 1 : 0.3 }}>●</span>
+                  <span style={{ opacity: dotFrame === 1 ? 1 : 0.3 }}>●</span>
+                  <span style={{ opacity: dotFrame === 2 ? 1 : 0.3 }}>●</span>
+                </span>
+              </div>
             )}
+
             <div ref={messagesEndRef} />
-            
-            {/* 打字动画指示器 */}
-            {typingEmployeeId && (() => {
-              const emp = employees.find(e => e.id === typingEmployeeId);
-              const config = emp ? getConfig(emp.type) : null;
+
+            {/* 会议总结生成动画 */}
+            {isSummarizing && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 0' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', animation: 'pulse 1.5s ease-in-out infinite' }}>
+                  <span style={{ fontSize: '24px' }}>📝</span>
+                </div>
+                <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>正在生成会议总结...</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>正在整理讨论内容</p>
+              </div>
+            )}
+
+            {/* 会议结束 - 总结展示 */}
+            {status === 'finished' && !isSummarizing && (() => {
+              const summaryItem = [...blackboard].reverse().find(item => item.type === 'summary');
+              if (!summaryItem) return null;
               return (
-                <div style={{
-                  display: 'flex',
-                  gap: '12px',
-                  alignItems: 'flex-start',
-                  justifyContent: 'flex-start',
-                  marginTop: '8px',
-                }}>
-                  <div style={{
-                    padding: '12px 16px',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    borderRadius: '12px',
-                    borderTopLeftRadius: '4px',
-                    border: `1px solid ${config?.color || '#6B7280'}30`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: config?.color || '#6B7280',
-                      animation: 'typingBounce 1.4s infinite ease-in-out both',
-                      animationDelay: '0s',
-                    }} />
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: config?.color || '#6B7280',
-                      animation: 'typingBounce 1.4s infinite ease-in-out both',
-                      animationDelay: '0.16s',
-                    }} />
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: config?.color || '#6B7280',
-                      animation: 'typingBounce 1.4s infinite ease-in-out both',
-                      animationDelay: '0.32s',
-                    }} />
+                <div style={{ marginTop: '16px', padding: '16px', borderRadius: '12px', background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '16px' }}>💡</span>
+                    </div>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>会议总结</span>
+                  </div>
+                  <div style={{ fontSize: '14px', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                    {summaryItem.content.split('\n').map((line, i) => {
+                      if (line.startsWith('**') && line.endsWith('**')) {
+                        return <p key={i} style={{ fontWeight: 600, marginTop: '8px', color: 'var(--text-primary)' }}>{line.replace(/\*\*/g, '')}</p>;
+                      }
+                      if (line.startsWith('- ') || line.match(/^\d+\.\s/)) {
+                        return <p key={i} style={{ marginLeft: '8px', color: 'var(--text-secondary)' }}>{line}</p>;
+                      }
+                      if (line.trim() === '') return <br key={i} />;
+                      return <span key={i}>{line}<br/></span>;
+                    })}
                   </div>
                 </div>
               );
             })()}
           </div>
 
-          {/* 输入区域 */}
-          <div style={{
-            padding: '16px 20px',
-            borderTop: '1px solid rgba(6, 182, 212, 0.2)',
-            background: 'rgba(15, 23, 42, 0.8)',
-          }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                disabled={!isMeetingActive}
-                placeholder={isMeetingActive ? "以仲裁者身份发言..." : "会议未开始"}
-                style={{
-                  flex: 1,
-                  padding: '12px 16px',
-                  background: 'rgba(30, 41, 59, 0.8)',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  color: '#F1F5F9',
-                  outline: 'none',
-                }}
-              />
+          {/* 输入框 */}
+          <div style={{ padding: '16px', background: 'var(--bg-card)', borderTop: '1px solid var(--border-default)' }}>
+            {/* @ 提及标签 */}
+            {mentionedIds.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                {mentionedIds.map(id => {
+                  const p = participants.find(x => x.id === id);
+                  return p ? (
+                    <span key={id} style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '12px', background: 'var(--blue-bg)', color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      @{p.name}
+                      <button onClick={() => setMentionedIds(mentionedIds.filter(x => x !== id))} style={{ cursor: 'pointer', color: 'var(--blue)', background: 'none', border: 'none', padding: '0 2px' }}>×</button>
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type="text"
+                  value={userInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setUserInput(val);
+                    // 检测 @ 触发
+                    const atIndex = val.lastIndexOf('@');
+                    if (atIndex >= 0 && (atIndex === 0 || val[atIndex - 1] === ' ')) {
+                      const searchText = val.slice(atIndex + 1);
+                      if (!searchText.includes(' ')) {
+                        setShowAtPicker(true);
+                      } else {
+                        setShowAtPicker(false);
+                      }
+                    } else {
+                      setShowAtPicker(false);
+                    }
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  placeholder={!meetingId ? "输入第一条消息作为议题..." : status === 'idle' ? "输入消息..." : status === 'waiting_next_round' ? "输入发言继续..." : status === 'finished' ? "输入最终决策..." : "作为仲裁者发言...（@某人指定回复）"}
+                  disabled={status === 'finished'}
+                  style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-input)', border: '1px solid var(--accent-border)', borderRadius: '10px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none' }}
+                />
+                {/* @ 提及选择器 */}
+                {showAtPicker && participants.length > 0 && (
+                  <div style={{ position: 'absolute', left: '0', bottom: '100%', marginBottom: '4px', width: '200px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--accent-border)', boxShadow: '0 4px 12px var(--shadow)', zIndex: 50, maxHeight: '160px', overflowY: 'auto' }}>
+                    {participants.filter(p => !mentionedIds.includes(p.id)).map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => { setMentionedIds([...mentionedIds, p.id]); setShowAtPicker(false); }}
+                        style={{ width: '100%', padding: '8px 12px', textAlign: 'left', fontSize: '13px', color: 'var(--text-primary)', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-muted)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        {p.avatar?.startsWith('/') ? <img src={p.avatar} alt="" style={{ width: '20px', height: '20px', borderRadius: '4px' }} /> : <span>{p.avatar}</span>}
+                        <span>{p.name}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{p.roleName}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
-                onClick={sendMessage}
-                disabled={!inputText.trim() || !isMeetingActive}
+                onClick={handleSend}
+                disabled={!userInput.trim() || status === 'finished'}
                 style={{
                   padding: '12px 20px',
-                  background: inputText.trim() && isMeetingActive
-                    ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-                    : 'rgba(30, 41, 59, 0.8)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  color: inputText.trim() && isMeetingActive ? 'white' : '#64748B',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: inputText.trim() && isMeetingActive ? 'pointer' : 'not-allowed',
-                }}
-              >
-                发言
-              </button>
-              {/* 协商控制按钮 */}
-              {isMeetingActive && (
-                isAutoSpeak ? (
-                  <button
-                    onClick={() => {
-                      stopNegotiation();
-                      setIsAutoSpeak(false);
-                    }}
-                    style={{
-                      padding: '12px 20px',
-                      background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                      border: 'none',
-                      borderRadius: '12px',
-                      color: 'white',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    ⏸️ 暂停
-                  </button>
-                ) : (
-                  <button
-                    onClick={resumeAutoSpeak}
-                    style={{
-                      padding: '12px 20px',
-                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                      border: 'none',
-                      borderRadius: '12px',
-                      color: 'white',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    ▶️ 继续
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ========== 右侧：共享黑板 ========== */}
-        <div style={{
-          width: '400px',
-          background: 'rgba(15, 23, 42, 0.6)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid rgba(6, 182, 212, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 500, color: '#F1F5F9' }}>📋 共享黑板</span>
-              {blackboard.length > 0 && (
-                <span style={{
-                  fontSize: '11px',
-                  padding: '2px 8px',
-                  background: 'rgba(6, 182, 212, 0.2)',
+                  background: userInput.trim() && status !== 'finished' ? 'var(--accent-hover)' : 'transparent',
+                  border: '1px solid var(--accent-border)',
                   borderRadius: '10px',
-                  color: '#06B6D4',
-                }}>
-                  {blackboard.length} 条
-                </span>
+                  color: userInput.trim() && status !== 'finished' ? 'var(--accent)' : 'var(--text-muted)',
+                  fontSize: '14px',
+                  cursor: userInput.trim() && status !== 'finished' ? 'pointer' : 'not-allowed',
+                }}
+              >
+                发送
+              </button>
+              {/* AI 模式选择器 */}
+              <select
+                value={aiMode}
+                onChange={(e) => setAIMode(e.target.value as 'openclaw' | 'llm')}
+                style={{
+                  padding: '8px 12px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--accent-border)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: aiMode === 'openclaw' ? 'var(--accent)' : 'var(--blue)',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+                title={aiMode === 'openclaw' ? '使用 OpenClaw Agent' : '使用 LLM API 直接调用'}
+              >
+                <option value="openclaw">🤖 OpenClaw</option>
+                <option value="llm">💬 LLM API</option>
+              </select>
+              {meetingId && status !== 'idle' && (
+                <button
+                  onClick={() => setAutoRound(!autoRound)}
+                  style={{
+                    padding: '12px 16px',
+                    background: autoRound ? 'var(--success-bg-strong)' : 'var(--bg-hover)',
+                    border: '1px solid var(--success-border)',
+                    borderRadius: '10px',
+                    color: autoRound ? 'var(--success)' : 'var(--text-muted)',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: autoRound ? 'var(--success)' : 'var(--text-muted)' }} />
+                  自动
+                </button>
               )}
-            </div>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <span style={{ fontSize: '10px', color: '#64748B' }}>💬{blackboard.filter(b => b.type === 'opinion').length}</span>
-              <span style={{ fontSize: '10px', color: '#EF4444' }}>❓{blackboard.filter(b => b.type === 'question').length}</span>
-              <span style={{ fontSize: '10px', color: '#10B981' }}>✅{blackboard.filter(b => b.type === 'decision').length}</span>
-              <span style={{ fontSize: '10px', color: '#F59E0B' }}>⏳{blackboard.filter(b => b.type === 'pending').length}</span>
-            </div>
-          </div>
-
-          {/* 黑板内容 */}
-          <div ref={bbListRef} style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}>
-            {blackboard.length === 0 ? (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '200px',
-                color: '#64748B',
-              }}>
-                <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📋</div>
-                <div style={{ fontSize: '13px' }}>黑板空空如也</div>
-                <div style={{ fontSize: '11px', marginTop: '4px' }}>开始会议后员工观点将显示在这里</div>
-              </div>
-            ) : (
-              blackboard.map(item => {
-                const typeConfig = getTypeConfig(item.type);
-                const authorConfig = getConfig(item.authorType);
-                const isUserAuthor = item.authorId === 'user';
-                
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      padding: '12px',
-                      background: typeConfig.bg,
-                      borderRadius: '12px',
-                      border: `1px solid ${typeConfig.border}`,
-                      position: 'relative',
-                    }}
-                  >
-                    {/* 头部：类型 + 作者 */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      marginBottom: '8px',
-                    }}>
-                      <span style={{ fontSize: '12px' }}>{typeConfig.icon}</span>
-                      <span style={{
-                        fontSize: '10px',
-                        color: typeConfig.color,
-                        fontWeight: 500,
-                      }}>
-                        {item.type === 'opinion' ? '观点' : 
-                         item.type === 'question' ? '问题' : 
-                         item.type === 'decision' ? '决定' : 
-                         item.type === 'pending' ? '待处理' : '总结'}
-                      </span>
-                      <span style={{
-                        fontSize: '11px',
-                        color: isUserAuthor ? '#F59E0B' : authorConfig.color,
-                        fontWeight: 500,
-                      }}>
-                        {item.authorName}
-                      </span>
-                      <span style={{ fontSize: '10px', color: '#64748B', marginLeft: 'auto' }}>
-                        {item.timestamp}
-                      </span>
-                    </div>
-                    
-                    {/* 内容 */}
-                    <div style={{
-                      fontSize: '13px',
-                      color: '#E2E8F0',
-                      lineHeight: 1.6,
-                    }}>
-                      {item.content}
-                    </div>
-
-                    {/* 引用关系 */}
-                    {item.targetName && (
-                      <div style={{
-                        marginTop: '6px',
-                        fontSize: '11px',
-                        color: '#64748B',
-                        fontStyle: 'italic',
-                      }}>
-                        ↳ 回应 {item.targetName}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* 黑板输入区 */}
-          <div style={{
-            padding: '12px 16px',
-            borderTop: '1px solid rgba(6, 182, 212, 0.1)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}>
-            <input
-              type="text"
-              value={bbInputText}
-              onChange={(e) => setBbInputText(e.target.value)}
-              placeholder="添加到黑板..."
-              style={{
-                padding: '8px 12px',
-                background: 'rgba(30, 41, 59, 0.8)',
-                border: '1px solid rgba(6, 182, 212, 0.3)',
-                borderRadius: '8px',
-                fontSize: '13px',
-                color: '#F1F5F9',
-                outline: 'none',
-              }}
-            />
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button
-                onClick={() => {
-                  if (bbInputText.trim()) {
-                    if (negotiationEngineRef.current) {
-                      negotiationEngineRef.current.userSpeak(bbInputText);
-                    } else {
-                      setBlackboard(prev => [...prev, {
-                        id: `bb-${Date.now()}`,
-                        authorId: 'user',
-                        authorName: '仲裁者（我）',
-                        authorType: 'user',
-                        type: 'opinion',
-                        content: bbInputText,
-                        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                      }]);
-                    }
-                    setBbInputText('');
-                  }
-                }}
-                disabled={!isMeetingActive}
-                style={{
-                  flex: 1,
-                  padding: '6px',
-                  background: 'rgba(30, 41, 59, 0.6)',
-                  border: '1px solid rgba(6, 182, 212, 0.2)',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  color: '#94A3B8',
-                  cursor: isMeetingActive ? 'pointer' : 'not-allowed',
-                }}
-              >
-                💬 观点
-              </button>
-              <button
-                onClick={() => {
-                  if (bbInputText.trim()) {
-                    const newItem = {
-                      id: `bb-${Date.now()}`,
-                      authorId: 'user',
-                      authorName: '仲裁者（我）',
-                      authorType: 'user',
-                      type: 'question' as const,
-                      content: bbInputText,
-                      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                    };
-                    if (negotiationEngineRef.current) {
-                      negotiationEngineRef.current.userAddQuestion(bbInputText);
-                    } else {
-                      setBlackboard(prev => [...prev, newItem]);
-                    }
-                    setBbInputText('');
-                  }
-                }}
-                disabled={!isMeetingActive}
-                style={{
-                  flex: 1,
-                  padding: '6px',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  color: '#EF4444',
-                  cursor: isMeetingActive ? 'pointer' : 'not-allowed',
-                }}
-              >
-                ❓ 问题
-              </button>
-              <button
-                onClick={() => {
-                  if (bbInputText.trim()) {
-                    const newItem = {
-                      id: `bb-${Date.now()}`,
-                      authorId: 'user',
-                      authorName: '仲裁者（我）',
-                      authorType: 'user',
-                      type: 'pending' as const,
-                      content: bbInputText,
-                      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                    };
-                    if (negotiationEngineRef.current) {
-                      negotiationEngineRef.current.userAddPending(bbInputText);
-                    } else {
-                      setBlackboard(prev => [...prev, newItem]);
-                    }
-                    setBbInputText('');
-                  }
-                }}
-                disabled={!isMeetingActive}
-                style={{
-                  flex: 1,
-                  padding: '6px',
-                  background: 'rgba(245, 158, 11, 0.1)',
-                  border: '1px solid rgba(245, 158, 11, 0.2)',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  color: '#F59E0B',
-                  cursor: isMeetingActive ? 'pointer' : 'not-allowed',
-                }}
-              >
-                ⏳ 待处理
-              </button>
             </div>
           </div>
         </div>
+
+        {/* 右侧：共享黑板 */}
+        {showBlackboard && (
+          <div style={{ width: '280px', background: 'var(--bg-card)', borderLeft: '1px solid var(--border-default)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>📋 共享黑板 ({blackboard.length})</span>
+              <button
+                onClick={() => {
+                  if (blackboard.length === 0) return;
+                  const lines = [`# ${topic}\n`, '---'];
+                  blackboard.forEach(item => {
+                    const emoji = item.type === 'opinion' ? '💬' : item.type === 'question' ? '❓' : item.type === 'decision' ? '✅' : item.type === 'pending' ? '⏳' : '📋';
+                    lines.push(`${emoji} **${item.authorName}** (${item.type})`);
+                    lines.push(item.content);
+                    lines.push('');
+                  });
+                  const text = lines.join('\n');
+                  const blob = new Blob([text], { type: 'text/markdown' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `会议黑板_${new Date().toLocaleString('zh-CN').replace(/[/:]/g, '-')}.md`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                style={{ padding: '4px 8px', background: 'var(--bg-hover)', border: '1px solid var(--border-default)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}
+              >
+                📥 导出
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+              {blackboard.map((item, i) => (
+                <div key={item.id || i} style={{ padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{item.authorName}</span>
+                    <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: item.type === 'opinion' ? 'var(--accent-muted)' : item.type === 'question' ? 'var(--danger-bg-strong)' : item.type === 'decision' ? 'var(--success-bg-strong)' : 'var(--warning-bg-strong)', color: item.type === 'opinion' ? 'var(--accent)' : item.type === 'question' ? 'var(--danger)' : item.type === 'decision' ? 'var(--success)' : 'var(--warning)' }}>
+                      {item.type === 'opinion' ? '💬' : item.type === 'question' ? '❓' : item.type === 'decision' ? '✅' : item.type === 'pending' ? '⏳' : '📋'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{item.content}</div>
+                </div>
+              ))}
+              {blackboard.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', marginTop: '40px' }}>
+                  黑板为空
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* 参与人详情弹窗 */}
+      {detailEmployee && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setDetailEmployee(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-card)', borderRadius: '16px', padding: '24px',
+              width: '380px', maxHeight: '85vh', overflowY: 'auto',
+              border: '1px solid var(--border-default)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* 头部 */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>👤 人员档案</div>
+              <button
+                onClick={() => setDetailEmployee(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '20px', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* 基本信息卡片 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'var(--bg-hover)', borderRadius: '12px', marginBottom: '14px' }}>
+              <div style={{ fontSize: '44px' }}>
+                {detailEmployee.avatar?.startsWith('/') ? (
+                  <img src={detailEmployee.avatar} alt={detailEmployee.name} style={{ width: '52px', height: '52px', borderRadius: '10px' }} />
+                ) : detailEmployee.avatar}
+              </div>
+              <div>
+                <div style={{ fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '3px' }}>{detailEmployee.name}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{detailEmployee.roleName}</div>
+              </div>
+            </div>
+
+            {/* 擅长技能 */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 500 }}>🎯 擅长技能</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {detailEmployee.expertise && detailEmployee.expertise.length > 0 ? (
+                  detailEmployee.expertise.map((skill, i) => (
+                    <span key={i} style={{
+                      padding: '5px 10px', borderRadius: '8px', fontSize: '12px',
+                      background: 'rgba(14, 165, 233, 0.15)', color: '#38BDF8',
+                      border: '1px solid rgba(14, 165, 233, 0.3)',
+                    }}>
+                      {skill}
+                    </span>
+                  ))
+                ) : (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>暂无技能信息</span>
+                )}
+              </div>
+            </div>
+
+            {/* 性格标签 */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 500 }}>🧠 性格特征</div>
+              {detailEmployee.personalities && detailEmployee.personalities.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {detailEmployee.personalities.map((tag, i) => {
+                    const TAG_MAP: Record<string, { label: string; desc: string; color: string }> = {
+                      analytical: { label: '🔍 分析型', desc: '注重数据与逻辑，决策谨慎', color: '#3B82F6' },
+                      creative: { label: '💡 创意型', desc: '思维活跃，善于提出新想法', color: '#8B5CF6' },
+                      pragmatic: { label: '⚡ 实干型', desc: '注重落地执行，关注可行性', color: '#F59E0B' },
+                      diplomatic: { label: '🤝 协调型', desc: '擅长沟通调解，平衡各方利益', color: '#10B981' },
+                      bold: { label: '🚀 进取型', desc: '敢于冒险，追求快速增长', color: '#EF4444' },
+                      cautious: { label: '🛡️ 稳健型', desc: '风险意识强，决策保守', color: '#6366F1' },
+                      empathetic: { label: '❤️ 共情型', desc: '关注人的感受，重视团队氛围', color: '#EC4899' },
+                      critical: { label: '❄️ 批判型', desc: '善于发现问题，质疑现状', color: '#14B8A6' },
+                      optimistic: { label: '☀️ 乐观型', desc: '积极正面，相信问题都能解决', color: '#F97316' },
+                      pessimistic: { label: '🌧️ 谨慎型', desc: '习惯考虑 worst case，防患未然', color: '#64748B' },
+                      leadership: { label: '👑 主导型', desc: '喜欢掌控节奏，引导讨论方向', color: '#FBBF24' },
+                      supportive: { label: '🌿 支持型', desc: '配合他人，补充细节与信息', color: '#84CC16' },
+                    };
+                    const info = TAG_MAP[tag] || { label: tag, desc: '', color: '#A78BFA' };
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '8px 12px', background: 'var(--bg-secondary)',
+                        borderRadius: '8px', fontSize: '12px',
+                      }}>
+                        <span style={{ color: info.color, fontWeight: 600 }}>{info.label}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{info.desc}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>暂无性格标签</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

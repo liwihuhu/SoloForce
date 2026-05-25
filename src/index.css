@@ -9,25 +9,139 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: #0F172A;
-  color: #E2E8F0;
 }
 
-/* 深海科技风全局样式 */
-:root {
-  --primary-dark: #0F172A;
-  --primary-darker: #020617;
-  --accent-cyan: #06B6D4;
-  --accent-blue: #3B82F6;
-  --accent-purple: #8B5CF6;
-  --glass-bg: rgba(30, 41, 59, 0.7);
-  --glass-border: rgba(148, 163, 184, 0.1);
+/* ========== 主题系统 ========== */
+
+/* 深色主题（默认） */
+:root, [data-theme="dark"] {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-card: rgba(30, 41, 59, 0.8);
+  --bg-card-hover: rgba(30, 41, 59, 0.95);
+  --bg-input: rgba(30, 41, 59, 0.8);
+  --bg-glass: rgba(30, 41, 59, 0.7);
+  --bg-hover: rgba(6, 182, 212, 0.1);
+  --bg-active: rgba(6, 182, 212, 0.2);
+  --bg-transparent: transparent;
+
   --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
+  --text-accent: #06B6D4;
+
+  --border-default: rgba(6, 182, 212, 0.2);
+  --border-hover: rgba(6, 182, 212, 0.4);
+  --border-active: rgba(6, 182, 212, 0.6);
+
+  --accent: #06B6D4;
+  --accent-hover: rgba(6, 182, 212, 0.3);
+  --accent-muted: rgba(6, 182, 212, 0.2);
+  --accent-border: rgba(6, 182, 212, 0.4);
+  --accent-bg: rgba(6, 182, 212, 0.1);
+
   --success: #10B981;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-bg-strong: rgba(16, 185, 129, 0.2);
+  --success-border: rgba(16, 185, 129, 0.3);
+
   --warning: #F59E0B;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --warning-bg-strong: rgba(245, 158, 11, 0.2);
+  --warning-border: rgba(245, 158, 11, 0.3);
+
   --danger: #EF4444;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-bg-strong: rgba(239, 68, 68, 0.2);
+
+  --blue: #3B82F6;
+  --blue-bg: rgba(59, 130, 246, 0.2);
+
+  --black-30: rgba(0, 0, 0, 0.3);
+
+  --success: #10B981;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --warning: #F59E0B;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --danger: #EF4444;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+  --scrollbar-track: rgba(15, 23, 42, 0.5);
+  --scrollbar-thumb: rgba(6, 182, 212, 0.3);
+
+  --gradient-start: #0F172A;
+  --gradient-end: #1E293B;
+
+  --react-flow-bg: rgba(15, 23, 42, 0.8);
+  --react-flow-handle: #06B6D4;
+}
+
+/* 浅色主题 */
+[data-theme="light"] {
+  --bg-primary: #F1F5F9;
+  --bg-secondary: #FFFFFF;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: rgba(255, 255, 255, 1);
+  --bg-input: rgba(255, 255, 255, 0.9);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  --bg-hover: rgba(14, 165, 233, 0.08);
+  --bg-active: rgba(14, 165, 233, 0.15);
+  --bg-transparent: transparent;
+
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  --text-accent: #0EA5E9;
+
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-hover: rgba(0, 0, 0, 0.2);
+  --border-active: rgba(14, 165, 233, 0.5);
+
+  --accent: #0EA5E9;
+  --accent-hover: rgba(14, 165, 233, 0.15);
+  --accent-muted: rgba(14, 165, 233, 0.1);
+  --accent-border: rgba(14, 165, 233, 0.4);
+  --accent-bg: rgba(14, 165, 233, 0.08);
+
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.08);
+  --success-bg-strong: rgba(5, 150, 105, 0.15);
+  --success-border: rgba(5, 150, 105, 0.3);
+
+  --warning: #D97706;
+  --warning-bg: rgba(217, 119, 6, 0.08);
+  --warning-bg-strong: rgba(217, 119, 6, 0.15);
+  --warning-border: rgba(217, 119, 6, 0.3);
+
+  --danger: #DC2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --danger-bg-strong: rgba(220, 38, 38, 0.15);
+
+  --blue: #2563EB;
+  --blue-bg: rgba(37, 99, 235, 0.1);
+
+  --black-30: rgba(0, 0, 0, 0.15);
+
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+  --scrollbar-track: rgba(0, 0, 0, 0.05);
+  --scrollbar-thumb: rgba(14, 165, 233, 0.3);
+
+  --gradient-start: #F1F5F9;
+  --gradient-end: #E2E8F0;
+
+  --react-flow-bg: rgba(241, 245, 249, 0.9);
+  --react-flow-handle: #0EA5E9;
+}
+
+/* 应用主题背景/文字色 */
+html, body, #root {
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 /* React Flow 样式覆盖 */
@@ -45,37 +159,37 @@ html, body, #root {
 }
 
 .react-flow__controls {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: var(--shadow-card) !important;
   border-radius: 8px !important;
   overflow: hidden !important;
 }
 
 .react-flow__controls-button {
-  background: rgba(30, 41, 59, 0.9) !important;
+  background: var(--bg-card) !important;
   border: none !important;
-  color: #E2E8F0 !important;
+  color: var(--text-primary) !important;
 }
 
 .react-flow__controls-button:hover {
-  background: rgba(6, 182, 212, 0.3) !important;
+  background: var(--accent-muted) !important;
 }
 
 .react-flow__controls-button svg {
-  fill: #06B6D4 !important;
+  fill: var(--accent) !important;
 }
 
 .react-flow__minimap {
-  background: rgba(15, 23, 42, 0.8) !important;
+  background: var(--react-flow-bg) !important;
   border-radius: 8px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: var(--shadow-card) !important;
 }
 
 .react-flow__minimap-mask {
-  fill: rgba(6, 182, 212, 0.2) !important;
+  fill: var(--accent-muted) !important;
 }
 
 .react-flow__background pattern circle {
-  fill: rgba(6, 182, 212, 0.1) !important;
+  fill: var(--accent-muted) !important;
 }
 
 /* 滚动条样式 */
@@ -85,17 +199,17 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--scrollbar-track);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(6, 182, 212, 0.3);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(6, 182, 212, 0.5);
+  background: var(--accent);
 }
 
 /* 按钮样式 */
@@ -110,29 +224,29 @@ button:hover {
 
 /* 输入框样式 */
 input, textarea, select {
-  background: rgba(30, 41, 59, 0.8) !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  color: #F1F5F9 !important;
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-default) !important;
+  color: var(--text-primary) !important;
   border-radius: 8px !important;
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: #06B6D4 !important;
+  border-color: var(--accent) !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2) !important;
+  box-shadow: 0 0 0 3px var(--accent-muted) !important;
 }
 
 /* 卡片玻璃拟态 */
 .glass-card {
-  background: var(--glass-bg);
+  background: var(--bg-glass);
   backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
 }
 
 /* 渐变文字 */
 .gradient-text {
-  background: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -140,9 +254,14 @@ input:focus, textarea:focus, select:focus {
 
 /* 发光效果 */
 .glow-cyan {
-  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+  box-shadow: 0 0 20px var(--accent-muted);
 }
 
 .glow-purple {
   box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+/* 主题切换动画 */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.1s ease;
 }

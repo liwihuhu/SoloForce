@@ -6,6 +6,24 @@ interface TaskResult {
   employee: { id: string; name: string; type: string; avatar: string };
   result: string;
   subResults?: TaskResult[];
+  // 新格式字段
+  nodeResponses?: Array<{
+    employee_id: string;
+    employee_name: string;
+    task_assigned: string;
+    response: string;
+  }>;
+  finalCommand?: string;
+  rawJson?: {
+    task_analysis: string;
+    node_responses: Array<{
+      employee_id: string;
+      employee_name: string;
+      task_assigned: string;
+      response: string;
+    }>;
+    final_command: string;
+  };
 }
 
 interface Message {
@@ -18,11 +36,19 @@ interface Message {
 
 // 提取执行官的命令
 function findExecutorCommand(result: TaskResult): string | null {
-  // 如果当前节点就是执行官，返回其结果
+  // 新格式：直接返回 finalCommand
+  if (result.finalCommand) {
+    return result.finalCommand;
+  }
+  // 新格式：从 rawJson 中提取
+  if (result.rawJson?.final_command) {
+    return result.rawJson.final_command;
+  }
+  // 旧格式：如果当前节点就是执行官，返回其结果
   if (result.employee.type === 'executor') {
     return result.result;
   }
-  // 递归查找子节点中的执行官
+  // 旧格式：递归查找子节点中的执行官
   if (result.subResults) {
     for (const sub of result.subResults) {
       const cmd = findExecutorCommand(sub);
@@ -34,12 +60,58 @@ function findExecutorCommand(result: TaskResult): string | null {
 
 // 将树形结果展平为列表
 function flattenTaskResults(result: TaskResult, order: number): Array<{ order: number; data: TaskResult }> {
-  const list: Array<{ order: number; data: TaskResult }> = [{ order, data: result }];
+  const list: Array<{ order: number; data: TaskResult }> = [];
+  
+  // 首先添加根节点（董事长）
+  list.push({ order, data: result });
+  
+  // 处理新的扁平格式 (nodeResponses)
+  if (result.nodeResponses && Array.isArray(result.nodeResponses) && result.nodeResponses.length > 0) {
+    // 获取当前团队的员工列表，用于过滤
+    const { employees, teams, currentTeamId } = useTopologyStore.getState();
+    
+    // 获取当前团队的成员 ID 列表
+    const currentTeam = teams.find(t => t.id === currentTeamId);
+    const teamMemberIds = currentTeam ? new Set(currentTeam.memberIds) : new Set<string>();
+    
+    result.nodeResponses.forEach((node, idx) => {
+      // 跳过根节点 emp-0（因为已经作为根节点添加了）
+      if (node.employee_id === result.employee.id) return;
+      
+      // 只添加在当前团队中的员工（通过 employee_id 或 employee_name 匹配）
+      const isInTeam = teamMemberIds.has(node.employee_id) || 
+        employees.some(e => e.id === node.employee_id);
+      
+      if (!isInTeam) {
+        console.log('[DEBUG] 跳过团队外员工:', node.employee_id, node.employee_name);
+        return;
+      }
+      
+      // 从 employees store 中获取完整的员工信息（包括头像）
+      const fullEmployee = employees.find(e => e.id === node.employee_id);
+      
+      list.push({
+        order: order + idx + 1,
+        data: {
+          employee: fullEmployee || { 
+            id: node.employee_id, 
+            name: node.employee_name, 
+            type: 'employee',
+            avatar: '' 
+          },
+          result: node.response,
+        }
+      });
+    });
+  }
+  
+  // 处理旧的树状格式 (subResults)
   if (result.subResults) {
     result.subResults.forEach((sub, idx) => {
       list.push(...flattenTaskResults(sub, order + idx + 1));
     });
   }
+  
   return list;
 }
 
@@ -48,7 +120,7 @@ export default function ChatPanel({
 }: { 
   onTaskExecute: (executing: boolean, result?: TaskResult) => void;
 }) {
-  const { edges, selectedEmployee, employees, teams, setSelectedEmployee } = useTopologyStore();
+  const { edges, selectedEmployee, employees, teams, setSelectedEmployee, aiMode, setAIMode } = useTopologyStore();
   const [taskInput, setTaskInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -110,12 +182,15 @@ export default function ChatPanel({
     onTaskExecute(true, undefined);
 
     try {
+      const { currentTeamId } = useTopologyStore.getState();
       const response = await fetch('http://localhost:5301/api/distribute-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           task: userMessage.content,
-          startEmployeeId: superadmin.id
+          startEmployeeId: superadmin.id,
+          teamId: currentTeamId,  // 传递团队ID，让服务器加载对应团队的关系
+          aiMode,  // 传递 AI 模式
         }),
       });
       
@@ -203,14 +278,15 @@ export default function ChatPanel({
       const historyData = await historyRes.json();
       const commandId = historyData.data?.id;
 
-      // 使用后端代理接口，避免跨域问题
-      const response = await fetch('http://localhost:5301/api/openclaw/execute', {
+      // 使用后端统一任务执行接口，支持 OpenClaw 和 LLM 双模式
+      const response = await fetch('http://localhost:5301/api/task/execute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           input: finalCommand,
+          aiMode,
         }),
       });
 
@@ -266,13 +342,13 @@ export default function ChatPanel({
               style={{
                 padding: '16px 18px',
                 background: isHighlighted 
-                  ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%)'
+                  ? 'linear-gradient(135deg, var(--warning-bg-strong) 0%, var(--warning-bg) 100%)'
                   : (isManager 
-                    ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(167, 139, 250, 0.08) 100%)'
-                    : 'rgba(30, 41, 59, 0.6)'),
+                    ? 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)'
+                    : 'var(--bg-card)'),
                 borderRadius: '14px',
-                border: `2px solid ${isHighlighted ? '#F59E0B' : (isManager ? '#8B5CF6' : 'rgba(148, 163, 184, 0.2)')}`,
-                boxShadow: isHighlighted ? '0 8px 24px rgba(245, 158, 11, 0.3)' : '0 4px 16px rgba(0, 0, 0, 0.2)',
+                border: `2px solid ${isHighlighted ? 'var(--warning)' : (isManager ? 'var(--accent)' : 'var(--border-default)')}`,
+                boxShadow: isHighlighted ? '0 8px 24px var(--warning-bg)' : 'var(--shadow-card)',
                 transition: 'all 0.3s ease',
                 cursor: 'pointer',
                 backdropFilter: 'blur(8px)',
@@ -286,8 +362,8 @@ export default function ChatPanel({
                   height: '44px', 
                   borderRadius: '50%',
                   overflow: 'hidden',
-                  background: '#1E293B',
-                  border: '2px solid rgba(6, 182, 212, 0.3)',
+                  background: 'var(--bg-secondary)',
+                  border: '2px solid var(--accent-border)',
                 }}>
                   {item.data.employee.avatar && item.data.employee.avatar.startsWith('/') ? (
                     <img 
@@ -300,13 +376,13 @@ export default function ChatPanel({
                   )}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: '15px', color: '#F1F5F9' }}>
+                  <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)' }}>
                     {item.data.employee.name}
                   </div>
                   <div style={{ 
                     fontSize: '11px', 
-                    color: isManager ? '#A78BFA' : '#94A3B8',
-                    background: isManager ? 'rgba(139, 92, 246, 0.2)' : 'rgba(148, 163, 184, 0.1)',
+                    color: isManager ? 'var(--accent)' : 'var(--text-secondary)',
+                    background: isManager ? 'var(--accent-muted)' : 'var(--bg-hover)',
                     padding: '2px 10px',
                     borderRadius: '10px',
                     display: 'inline-block',
@@ -317,11 +393,11 @@ export default function ChatPanel({
                 </div>
                 <div style={{
                   fontSize: '11px',
-                  color: '#64748B',
-                  background: 'rgba(30, 41, 59, 0.8)',
+                  color: 'var(--text-muted)',
+                  background: 'var(--bg-card)',
                   padding: '4px 10px',
                   borderRadius: '12px',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  border: '1px solid var(--border-default)',
                 }}>
                   #{item.order + 1}
                 </div>
@@ -337,9 +413,9 @@ export default function ChatPanel({
                 lineHeight: 1.7,
                 whiteSpace: 'pre-wrap',
                 padding: '12px',
-                background: 'rgba(15, 23, 42, 0.5)',
+                background: 'var(--bg-card)',
                 borderRadius: '10px',
-                border: '1px solid rgba(148, 163, 184, 0.1)',
+                border: '1px solid var(--border-default)',
               }}>
                 {item.data.result}
               </div>
@@ -354,8 +430,8 @@ export default function ChatPanel({
     <div style={{
       width: '420px',
       height: 'calc(100vh - 50px)',
-      background: 'linear-gradient(180deg, #1E293B 0%, #0F172A 100%)',
-      borderLeft: '1px solid rgba(6, 182, 212, 0.2)',
+      background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
+      borderLeft: '1px solid var(--accent-border)',
       display: 'flex',
       flexDirection: 'column',
       boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.3)',
@@ -364,19 +440,19 @@ export default function ChatPanel({
       <div style={{
         padding: '20px',
         borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
-        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(15, 23, 42, 0.8) 100%)',
+        background: 'linear-gradient(135deg, var(--warning-bg) 0%, var(--bg-primary) 100%)',
       }}>
         <h1 style={{ 
           fontSize: '20px', 
           fontWeight: 'bold', 
-          background: 'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)',
+          background: 'linear-gradient(135deg, var(--warning) 0%, var(--warning) 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           margin: 0 
         }}>
-          董事长命令中心
+          命令中心
         </h1>
-        <p style={{ fontSize: '13px', color: '#94A3B8', margin: '6px 0 0 0' }}>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '6px 0 0 0' }}>
           输入任务指令，AI 自动分配执行
         </p>
       </div>
@@ -387,32 +463,32 @@ export default function ChatPanel({
         minHeight: 0,
         overflowY: 'auto',
         padding: '20px',
-        background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)',
+        background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
       }}>
         {messages.length === 0 ? (
           <div style={{ 
             textAlign: 'center', 
             padding: '60px 30px',
-            color: '#475569' 
+            color: 'var(--text-muted)' 
           }}>
             <div style={{ 
               fontSize: '64px', 
               marginBottom: '24px',
-              filter: 'drop-shadow(0 4px 12px rgba(6, 182, 212, 0.3))',
+              filter: 'drop-shadow(0 4px 12px var(--accent-muted))',
               animation: 'float 3s ease-in-out infinite'
             }}>🎯</div>
             <div style={{ 
               fontSize: '16px', 
               fontWeight: 500, 
               marginBottom: '12px', 
-              color: '#E2E8F0' 
+              color: 'var(--text-primary)' 
             }}>
               欢迎使用任务分发系统
             </div>
             <div style={{ 
               fontSize: '13px', 
               lineHeight: 1.8, 
-              color: '#64748B',
+              color: 'var(--text-muted)',
               maxWidth: '280px',
               margin: '0 auto'
             }}>
@@ -435,12 +511,12 @@ export default function ChatPanel({
                     <div style={{
                       maxWidth: '90%',
                       padding: '14px 18px',
-                      background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+                      background: 'linear-gradient(135deg, var(--accent) 0%, #0891B2 100%)',
                       color: 'white',
                       borderRadius: '18px 18px 6px 18px',
                       fontSize: '14px',
                       lineHeight: 1.5,
-                      boxShadow: '0 4px 16px rgba(6, 182, 212, 0.3)',
+                      boxShadow: '0 4px 16px var(--accent-muted)',
                     }}>
                       {msg.content}
                     </div>
@@ -450,8 +526,8 @@ export default function ChatPanel({
                   <div>
                     <div style={{
                       padding: '14px 18px',
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)',
-                      color: '#E2E8F0',
+                      background: 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)',
+                      color: 'var(--text-primary)',
                       borderRadius: '18px 18px 18px 6px',
                       fontSize: '13px',
                       marginBottom: '16px',
@@ -462,7 +538,7 @@ export default function ChatPanel({
                       backdropFilter: 'blur(8px)',
                     }}>
                       <span style={{ 
-                        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                        background: 'linear-gradient(135deg, var(--success) 0%, var(--success) 100%)',
                         padding: '4px 10px',
                         borderRadius: '12px',
                         fontSize: '12px'
@@ -477,7 +553,7 @@ export default function ChatPanel({
             {isExecuting && (
               <div style={{ 
                 padding: '18px 20px', 
-                background: 'rgba(30, 41, 59, 0.8)',
+                background: 'var(--bg-card)',
                 borderRadius: '16px',
                 display: 'flex',
                 alignItems: 'center',
@@ -488,12 +564,12 @@ export default function ChatPanel({
                 <div style={{
                   width: '20px',
                   height: '20px',
-                  border: '2px solid rgba(6, 182, 212, 0.3)',
-                  borderTopColor: '#06B6D4',
+                  border: '2px solid var(--accent-border)',
+                  borderTopColor: 'var(--accent)',
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite',
                 }} />
-                <span style={{ fontSize: '13px', color: '#94A3B8' }}>AI 正在分析任务并分配给员工...</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>AI 正在分析任务并分配给员工...</span>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               </div>
             )}
@@ -506,7 +582,7 @@ export default function ChatPanel({
       <div style={{
         padding: '20px',
         borderTop: '1px solid rgba(6, 182, 212, 0.2)',
-        background: 'linear-gradient(180deg, #1E293B 0%, #0F172A 100%)',
+        background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
       }}>
         <textarea
           value={taskInput}
@@ -523,18 +599,18 @@ export default function ChatPanel({
           style={{
             width: '100%',
             padding: '14px 16px',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
+            border: '1px solid var(--border-default)',
             borderRadius: '14px',
             fontSize: '14px',
             resize: 'none',
             fontFamily: 'inherit',
             outline: 'none',
-            background: 'rgba(30, 41, 59, 0.8)',
-            color: '#F1F5F9',
+            background: 'var(--bg-card)',
+            color: 'var(--text-primary)',
             backdropFilter: 'blur(8px)',
           }}
           onFocus={(e) => {
-            e.target.style.borderColor = '#06B6D4';
+            e.target.style.borderColor = 'var(--accent)';
             e.target.style.boxShadow = '0 0 0 3px rgba(6, 182, 212, 0.2)';
           }}
           onBlur={(e) => {
@@ -542,6 +618,27 @@ export default function ChatPanel({
             e.target.style.boxShadow = 'none';
           }}
         />
+        {/* AI 模式选择器 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>AI 模式：</span>
+          <select
+            value={aiMode}
+            onChange={(e) => setAIMode(e.target.value as 'openclaw' | 'llm')}
+            style={{
+              padding: '6px 12px',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-default)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: aiMode === 'openclaw' ? 'var(--accent)' : 'var(--blue)',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="openclaw">🤖 OpenClaw</option>
+            <option value="llm">💬 LLM API</option>
+          </select>
+        </div>
         <button
           onClick={handleExecuteTask}
           disabled={!taskInput.trim() || isExecuting}
@@ -551,52 +648,54 @@ export default function ChatPanel({
             padding: '14px',
             background: isExecuting 
               ? 'rgba(71, 85, 105, 0.5)' 
-              : 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+              : aiMode === 'openclaw' 
+                ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
             color: 'white',
             border: 'none',
             borderRadius: '12px',
             fontSize: '14px',
             fontWeight: 600,
             cursor: isExecuting ? 'not-allowed' : 'pointer',
-            boxShadow: isExecuting ? 'none' : '0 4px 16px rgba(245, 158, 11, 0.3)',
+            boxShadow: isExecuting ? 'none' : 'var(--shadow-card)',
             transition: 'all 0.2s ease',
           }}
         >
-          {isExecuting ? '执行中...' : '发送任务'}
+          {isExecuting ? '执行中...' : aiMode === 'openclaw' ? '🤖 发送到 OpenClaw 执行' : '💬 发送到 LLM 执行'}
         </button>
       </div>
 
       {/* 统计 */}
       <div style={{
         padding: '12px 20px',
-        borderTop: '1px solid rgba(6, 182, 212, 0.2)',
-        background: 'rgba(15, 23, 42, 0.8)',
+        borderTop: '1px solid var(--border-default)',
+        background: 'var(--bg-secondary)',
         fontSize: '12px',
-        color: '#64748B',
+        color: 'var(--text-muted)',
         display: 'flex',
         justifyContent: 'space-between',
       }}>
         <span style={{ 
-          background: 'rgba(6, 182, 212, 0.1)', 
+          background: 'var(--accent-bg)', 
           padding: '4px 12px', 
           borderRadius: '20px',
-          color: '#06B6D4'
+          color: 'var(--accent)'
         }}>
           员工: {PRESET_EMPLOYEES.length}
         </span>
         <span style={{ 
-          background: 'rgba(139, 92, 246, 0.1)', 
+          background: 'var(--accent-muted)', 
           padding: '4px 12px', 
           borderRadius: '20px',
-          color: '#8B5CF6'
+          color: 'var(--accent)'
         }}>
           关系: {edges.length}
         </span>
         <span style={{ 
-          background: 'rgba(245, 158, 11, 0.1)', 
+          background: 'var(--warning-bg)', 
           padding: '4px 12px', 
           borderRadius: '20px',
-          color: '#F59E0B'
+          color: 'var(--warning)'
         }}>
           消息: {messages.length}
         </span>
@@ -611,7 +710,7 @@ export default function ChatPanel({
           transform: 'translateX(-50%)',
           width: 'calc(100% - 400px)',
           maxWidth: '800px',
-          background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+          background: 'linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
           borderRadius: '16px',
           padding: '24px',
           border: '1px solid rgba(245, 158, 11, 0.3)',
@@ -627,7 +726,7 @@ export default function ChatPanel({
             <h3 style={{ 
               fontSize: '18px', 
               fontWeight: 600, 
-              color: '#F59E0B',
+              color: 'var(--warning)',
               margin: 0 
             }}>
               执行命令确认
@@ -637,7 +736,7 @@ export default function ChatPanel({
               style={{
                 padding: '6px 12px',
                 background: 'transparent',
-                color: '#94A3B8',
+                color: 'var(--text-secondary)',
                 border: 'none',
                 fontSize: '20px',
                 cursor: 'pointer',
@@ -648,7 +747,7 @@ export default function ChatPanel({
           </div>
           
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
               执行官整理的执行命令（可编辑）：
             </label>
             <textarea
@@ -658,11 +757,11 @@ export default function ChatPanel({
               style={{
                 width: '100%',
                 padding: '14px',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
+                border: '1px solid var(--warning-border)',
                 borderRadius: '10px',
                 fontSize: '14px',
-                background: 'rgba(15, 23, 42, 0.8)',
-                color: '#F1F5F9',
+                background: 'var(--bg-input)',
+                color: 'var(--text-primary)',
                 outline: 'none',
                 resize: 'vertical',
                 fontFamily: 'monospace',
@@ -679,8 +778,8 @@ export default function ChatPanel({
                 flex: 1,
                 padding: '12px 20px',
                 background: isSendingCommand 
-                  ? 'rgba(100, 116, 139, 0.3)' 
-                  : 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                  ? 'var(--bg-hover)' 
+                  : 'linear-gradient(135deg, var(--warning) 0%, var(--warning) 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '10px',
@@ -697,8 +796,8 @@ export default function ChatPanel({
               style={{
                 padding: '12px 20px',
                 background: 'rgba(71, 85, 105, 0.3)',
-                color: '#94A3B8',
-                border: '1px solid rgba(148, 163, 184, 0.2)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-default)',
                 borderRadius: '10px',
                 fontSize: '14px',
                 cursor: 'pointer',
@@ -717,10 +816,10 @@ export default function ChatPanel({
               border: '1px solid rgba(16, 185, 129, 0.3)',
               borderRadius: '10px',
             }}>
-              <div style={{ fontSize: '14px', color: '#10B981', marginBottom: '10px', fontWeight: 600 }}>
+              <div style={{ fontSize: '14px', color: 'var(--success)', marginBottom: '10px', fontWeight: 600 }}>
                 执行结果：
               </div>
-              <div style={{ fontSize: '14px', color: '#E2E8F0', whiteSpace: 'pre-wrap', maxHeight: '250px', overflow: 'auto', lineHeight: '1.6' }}>
+              <div style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', maxHeight: '250px', overflow: 'auto', lineHeight: '1.6' }}>
                 {commandResult}
               </div>
             </div>

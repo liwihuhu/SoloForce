@@ -1,4 +1,4 @@
-// 团队拓扑页面
+// 命令链路页面
 // 功能：将开发中...
 
 export default function TeamTopology() {
@@ -9,8 +9,8 @@ export default function TeamTopology() {
       justifyContent: 'center',
       height: '100%',
       flexDirection: 'column',
-      color: '#64748B',
-      background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)',
+      color: 'var(--text-muted)',
+      background: 'var(--bg-primary)',
       padding: '20px',
     }}>
       <div style={{ 
@@ -22,17 +22,17 @@ export default function TeamTopology() {
         fontSize: '22px', 
         fontWeight: 500, 
         marginBottom: '12px',
-        color: '#E2E8F0'
+        color: 'var(--text-primary)'
       }}>
-        团队拓扑
+        命令链路
       </div>
       <div style={{ 
         fontSize: '14px', 
-        color: '#64748B',
+        color: 'var(--text-muted)',
         padding: '8px 20px',
-        background: 'rgba(30, 41, 59, 0.6)',
+        background: 'var(--bg-card)',
         borderRadius: '20px',
-        border: '1px solid rgba(148, 163, 184, 0.2)',
+        border: '1px solid var(--border-default)',
       }}>
         功能开发中...
       </div>

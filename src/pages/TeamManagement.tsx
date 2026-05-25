@@ -208,7 +208,7 @@ export default function TeamManagement() {
   const getEmployee = (id: string) => employees.find(e => e.id === id);
 
   return (
-    <div style={{ padding: '24px', height: '100%', overflow: 'auto', background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)' }}>
+    <div style={{ padding: '24px', height: '100%', overflow: 'auto', background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)' }}>
       {/* 顶部工具栏 */}
       <div style={{ 
         display: 'flex', 
@@ -220,7 +220,7 @@ export default function TeamManagement() {
           margin: 0, 
           fontSize: '24px', 
           fontWeight: 600,
-          background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+          background: 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}>
@@ -246,14 +246,14 @@ export default function TeamManagement() {
 
       {/* 团队列表 */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#64748B' }}>
+        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}></div>
           加载中...
         </div>
       ) : teams.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#64748B' }}>
+        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: '64px', marginBottom: '20px', opacity: 0.5 }}></div>
-          <div style={{ fontSize: '16px', marginBottom: '8px', color: '#94A3B8' }}>暂无团队</div>
+          <div style={{ fontSize: '16px', marginBottom: '8px', color: 'var(--text-secondary)' }}>暂无团队</div>
           <div style={{ fontSize: '13px' }}>点击"新建团队"创建第一个团队</div>
         </div>
       ) : (
@@ -270,7 +270,7 @@ export default function TeamManagement() {
               <div
                 key={team.id}
                 style={{
-                  background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%)',
+                  background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-primary) 100%)',
                   borderRadius: '16px',
                   padding: '20px',
                   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
@@ -284,7 +284,7 @@ export default function TeamManagement() {
                     width: '52px',
                     height: '52px',
                     borderRadius: '14px',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                    background: 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -295,10 +295,10 @@ export default function TeamManagement() {
                     <img src={team.avatar || '/avatars/manager.png'} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '4px', color: '#F1F5F9' }}>
+                    <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '4px', color: 'var(--text-primary)' }}>
                       {team.name}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#94A3B8' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
                       {memberCount} 名成员，{relationshipCount} 条关系
                     </div>
                   </div>
@@ -306,7 +306,7 @@ export default function TeamManagement() {
 
                 {/* 描述 */}
                 {team.description && (
-                  <div style={{ fontSize: '14px', color: '#94A3B8', marginBottom: '14px', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.6 }}>
                     {team.description}
                   </div>
                 )}
@@ -320,8 +320,8 @@ export default function TeamManagement() {
                         padding: '4px 10px',
                         borderRadius: '20px',
                         fontSize: '12px',
-                        background: 'rgba(6, 182, 212, 0.15)',
-                        color: '#06B6D4',
+                        background: 'var(--accent-bg)',
+                        color: 'var(--accent)',
                         border: '1px solid rgba(6, 182, 212, 0.2)',
                         display: 'flex',
                         alignItems: 'center',
@@ -337,7 +337,7 @@ export default function TeamManagement() {
                     ) : null;
                   })}
                   {team.memberIds.length > 6 && (
-                    <span style={{ fontSize: '11px', color: '#9CA3AF' }}>+{team.memberIds.length - 6}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>+{team.memberIds.length - 6}</span>
                   )}
                 </div>
 
@@ -348,7 +348,7 @@ export default function TeamManagement() {
                     style={{
                       flex: 1,
                       padding: '10px 14px',
-                      background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+                      background: 'linear-gradient(135deg, var(--accent) 0%, #0891B2 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '10px',
@@ -364,8 +364,8 @@ export default function TeamManagement() {
                     onClick={() => openEditModal(team)}
                     style={{
                       padding: '10px 14px',
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%)',
-                      color: '#A78BFA',
+                      background: 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)',
+                      color: 'var(--accent)',
                       border: '1px solid rgba(139, 92, 246, 0.3)',
                       borderRadius: '10px',
                       fontSize: '13px',
@@ -379,7 +379,7 @@ export default function TeamManagement() {
                       onClick={() => handleDelete(team)}
                       style={{
                         padding: '10px 14px',
-                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                        background: 'linear-gradient(135deg, var(--danger-bg) 0%, var(--danger-bg) 100%)',
                         color: '#F87171',
                         border: '1px solid rgba(239, 68, 68, 0.3)',
                         borderRadius: '10px',
@@ -426,7 +426,7 @@ export default function TeamManagement() {
               margin: '0 0 24px 0', 
               fontSize: '22px', 
               fontWeight: 600,
-              background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+              background: 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
             }}>
@@ -436,7 +436,7 @@ export default function TeamManagement() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               {/* 团队名称 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   团队名称 <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
@@ -450,7 +450,7 @@ export default function TeamManagement() {
                     borderRadius: '10px',
                     fontSize: '14px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                   }}
                 />
@@ -458,7 +458,7 @@ export default function TeamManagement() {
 
               {/* 团队头像选择 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   团队头像
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -486,7 +486,7 @@ export default function TeamManagement() {
 
               {/* 描述 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   描述
                 </label>
                 <textarea
@@ -501,7 +501,7 @@ export default function TeamManagement() {
                     fontSize: '14px',
                     resize: 'vertical',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
+                    color: 'var(--text-primary)',
                     outline: 'none',
                   }}
                 />
@@ -509,7 +509,7 @@ export default function TeamManagement() {
 
               {/* 成员选择 */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#94A3B8' }}>
+                <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   团队成员 <span style={{ color: '#EF4444' }}>*（董事长和执行官为必选）</span>
                 </label>
                 <div style={{ 
@@ -548,16 +548,16 @@ export default function TeamManagement() {
                           ) : (
                             <span style={{ fontSize: '18px' }}>{emp.avatar}</span>
                           )}
-                          <span style={{ fontSize: '14px', fontWeight: 500, color: '#F1F5F9' }}>{emp.name}</span>
+                          <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>{emp.name}</span>
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                           {isRequired ? '（必选）' : emp.roleName || emp.type}
                         </div>
                       </div>
                     );
                   })}
                   {!employees.length && (
-                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '20px', color: '#64748B' }}>
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                       暂无可用员工，请先添加员工
                     </div>
                   )}
@@ -573,7 +573,7 @@ export default function TeamManagement() {
                   flex: 1,
                   padding: '14px',
                   background: 'rgba(71, 85, 105, 0.3)',
-                  color: '#94A3B8',
+                  color: 'var(--text-secondary)',
                   border: '1px solid rgba(148, 163, 184, 0.2)',
                   borderRadius: '12px',
                   fontSize: '14px',
@@ -589,7 +589,7 @@ export default function TeamManagement() {
                 style={{
                   flex: 1,
                   padding: '14px',
-                  background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+                  background: 'linear-gradient(135deg, var(--accent) 0%, #0891B2 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '12px',

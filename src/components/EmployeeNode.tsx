@@ -13,14 +13,14 @@ interface EmployeeNodeData {
   isSelected?: boolean;
 }
 
-const defaultConfig = { color: '#64748B', bgColor: 'rgba(30, 41, 59, 0.8)' };
+const defaultConfig = { color: 'var(--text-muted)', bgColor: 'var(--bg-card)' };
 
-// 执行动画样式 - 更明显的效果
+// 执行动画样式 - 更明显的效果（分开 animation 和 boxShadow）
 const executingAnimations = {
-  pulse: `animation: nodePulse 1s ease-in-out infinite; box-shadow: 0 0 30px rgba(6, 182, 212, 0.6);`,
-  glow: `animation: nodeGlow 1.5s ease-in-out infinite; box-shadow: 0 0 40px rgba(6, 182, 212, 0.8);`,
-  shimmer: `animation: nodeShimmer 1.5s ease-in-out infinite; box-shadow: 0 0 25px rgba(6, 182, 212, 0.5);`,
-  ring: `animation: nodeRing 1s ease-out infinite; box-shadow: 0 0 35px rgba(6, 182, 212, 0.7);`,
+  pulse: { animation: 'nodePulse 1s ease-in-out infinite', boxShadow: '0 0 30px var(--accent)' },
+  glow: { animation: 'nodeGlow 1.5s ease-in-out infinite', boxShadow: '0 0 40px var(--accent)' },
+  shimmer: { animation: 'nodeShimmer 1.5s ease-in-out infinite', boxShadow: '0 0 25px var(--accent)' },
+  ring: { animation: 'nodeRing 1s ease-out infinite', boxShadow: '0 0 35px var(--accent)' },
 };
 
 function EmployeeNode({ data }: NodeProps) {
@@ -35,19 +35,19 @@ function EmployeeNode({ data }: NodeProps) {
     return (
       <div
         style={{
-          background: 'rgba(30, 41, 59, 0.9)',
-          border: '2px solid #475569',
+          background: 'var(--bg-card)',
+          border: '2px solid var(--border-default)',
           borderRadius: '12px',
           padding: '10px',
           minWidth: '130px',
           maxWidth: '150px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+          boxShadow: 'var(--shadow-card)',
           backdropFilter: 'blur(8px)',
         }}
       >
-        <Handle type="target" position={Position.Top} style={{ background: '#475569', width: '10px', height: '10px' }} />
-        <div style={{ textAlign: 'center', color: '#64748B' }}>?</div>
-        <Handle type="source" position={Position.Bottom} style={{ background: '#475569', width: '10px', height: '10px' }} />
+        <Handle type="target" position={Position.Top} style={{ background: 'var(--border-default)', width: '10px', height: '10px' }} />
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>?</div>
+        <Handle type="source" position={Position.Bottom} style={{ background: 'var(--border-default)', width: '10px', height: '10px' }} />
       </div>
     );
   }
@@ -60,7 +60,7 @@ function EmployeeNode({ data }: NodeProps) {
   const isSpecial = isSuperadmin || isExecutor;
 
   // 根据员工ID生成不同的动画
-  const getAnimation = (id: string): string => {
+  const getAnimation = (id: string) => {
     const index = parseInt(id.replace(/\D/g, '')) || 0;
     const animKeys = Object.keys(executingAnimations) as Array<keyof typeof executingAnimations>;
     return executingAnimations[animKeys[index % animKeys.length]];
@@ -68,24 +68,24 @@ function EmployeeNode({ data }: NodeProps) {
 
   // 确定边框颜色
   const getBorderColor = () => {
-    if (!isInRelationship && !isSpecial) return '#475569'; // 灰色边框：未参与关系
-    if (isExecuting) return '#06B6D4';
-    if (isSuperadmin) return '#F59E0B';
-    if (isExecutor) return '#EF4444'; // 执行官红色
+    if (!isInRelationship && !isSpecial) return 'var(--border-default)'; // 灰色边框：未参与关系
+    if (isExecuting) return 'var(--accent)';
+    if (isSuperadmin) return 'var(--warning)';
+    if (isExecutor) return 'var(--danger)'; // 执行官红色
     return config.color;
   };
 
   // 确定背景
   const getBackground = () => {
-    if (isSuperadmin) return 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(253, 230, 138, 0.1) 100%)';
-    if (isExecutor) return 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(254, 202, 202, 0.1) 100%)';
+    if (isSuperadmin) return 'linear-gradient(135deg, var(--warning-bg-strong) 0%, var(--warning-bg) 100%)';
+    if (isExecutor) return 'linear-gradient(135deg, var(--danger-bg-strong) 0%, var(--danger-bg) 100%)';
     if (isExecuting) {
       return isInRelationship 
-        ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(59, 130, 246, 0.15) 100%)'
-        : 'rgba(30, 41, 59, 0.8)';
+        ? 'linear-gradient(135deg, var(--accent-muted) 0%, var(--blue-bg) 100%)'
+        : 'var(--bg-card)';
     }
-    if (!isInRelationship && !isSpecial) return 'rgba(30, 41, 59, 0.6)';
-    return 'rgba(30, 41, 59, 0.9)';
+    if (!isInRelationship && !isSpecial) return 'var(--bg-card-hover)';
+    return 'var(--bg-card)';
   };
 
   return (
@@ -98,15 +98,13 @@ function EmployeeNode({ data }: NodeProps) {
         minWidth: '140px',
         maxWidth: '160px',
         boxShadow: isExecuting 
-          ? `0 0 25px rgba(6, 182, 212, 0.4), 0 8px 32px rgba(0, 0, 0, 0.4)`
+          ? `0 0 25px var(--accent-muted), var(--shadow-card)`
           : isSuperadmin 
-            ? '0 0 25px rgba(245, 158, 11, 0.3), 0 8px 32px rgba(0, 0, 0, 0.4)'
-            : '0 8px 32px rgba(0, 0, 0, 0.4)',
+            ? '0 0 25px var(--warning-bg-strong), var(--shadow-card)'
+            : 'var(--shadow-card)',
         transition: 'all 0.3s ease',
         backdropFilter: 'blur(12px)',
-        ...(isExecuting && isInRelationship ? { 
-          animation: getAnimation(employee.id),
-        } : {}),
+        ...(isExecuting && isInRelationship ? getAnimation(employee.id) : {}),
       }}
     >
       {/* 执行状态指示器 */}
@@ -138,9 +136,9 @@ function EmployeeNode({ data }: NodeProps) {
           right: '-6px',
           width: '14px',
           height: '14px',
-          background: '#475569',
+          background: 'var(--border-default)',
           borderRadius: '50%',
-          border: '2px solid #1E293B',
+          border: '2px solid var(--bg-secondary)',
         }} />
       )}
 
@@ -150,10 +148,10 @@ function EmployeeNode({ data }: NodeProps) {
           type="target"
           position={Position.Top}
           style={{ 
-            background: isExecuting && isInRelationship ? '#06B6D4' : (!isInRelationship && !isExecutor ? '#475569' : (isExecutor ? '#EF4444' : config.color)), 
+            background: isExecuting && isInRelationship ? 'var(--accent)' : (!isInRelationship && !isExecutor ? 'var(--border-default)' : (isExecutor ? 'var(--danger)' : config.color)), 
             width: '12px', 
             height: '12px',
-            border: '2px solid #0F172A'
+            border: '2px solid var(--bg-primary)'
           }}
         />
       )}
@@ -166,9 +164,9 @@ function EmployeeNode({ data }: NodeProps) {
           margin: '0 auto 6px',
           borderRadius: '50%',
           overflow: 'hidden',
-          background: '#1E293B',
+          background: 'var(--bg-secondary)',
           border: `2px solid ${config.color}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          boxShadow: 'var(--shadow-card)'
         }}>
           {employee.avatar && employee.avatar.startsWith('/') ? (
             <img 
@@ -177,7 +175,7 @@ function EmployeeNode({ data }: NodeProps) {
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
-            <div style={{ fontSize: '28px', lineHeight: '52px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>
+            <div style={{ fontSize: '28px', lineHeight: '52px', filter: 'drop-shadow(0 2px 4px var(--shadow))' }}>
               {employee.avatar}
             </div>
           )}
@@ -185,39 +183,38 @@ function EmployeeNode({ data }: NodeProps) {
         <div style={{ 
           fontWeight: 600, 
           fontSize: '14px', 
-          color: '#F1F5F9', 
+          color: 'var(--text-primary)', 
           marginBottom: '6px',
-          textShadow: '0 1px 2px rgba(0,0,0,0.3)'
         }}>
           {employee.name}
         </div>
         <div style={{
           fontSize: '11px',
-          color: isSuperadmin ? '#FBBF24' : (isExecutor ? '#F87171' : (isExecuting && isInRelationship ? '#22D3EE' : (!isInRelationship ? '#64748B' : config.color))),
-          background: isSuperadmin ? 'rgba(245, 158, 11, 0.2)' : (isExecutor ? 'rgba(239, 68, 68, 0.2)' : (isExecuting && isInRelationship ? 'rgba(6, 182, 212, 0.2)' : (!isInRelationship ? 'rgba(71, 85, 105, 0.5)' : 'rgba(6, 182, 212, 0.1)'))),
+          color: isSuperadmin ? 'var(--warning)' : (isExecutor ? 'var(--danger)' : (isExecuting && isInRelationship ? 'var(--accent)' : (!isInRelationship ? 'var(--text-muted)' : config.color))),
+          background: isSuperadmin ? 'var(--warning-bg-strong)' : (isExecutor ? 'var(--danger-bg-strong)' : (isExecuting && isInRelationship ? 'var(--accent-muted)' : (!isInRelationship ? 'var(--bg-hover)' : 'var(--accent-bg)'))),
           padding: '4px 10px',
           borderRadius: '12px',
           display: 'inline-block',
-          border: `1px solid ${isSuperadmin ? 'rgba(245, 158, 11, 0.3)' : (isExecutor ? 'rgba(239, 68, 68, 0.3)' : (isExecuting && isInRelationship ? 'rgba(6, 182, 212, 0.3)' : 'rgba(71, 85, 105, 0.3)'))}`,
+          border: `1px solid ${isSuperadmin ? 'var(--warning-bg-strong)' : (isExecutor ? 'var(--danger-bg-strong)' : (isExecuting && isInRelationship ? 'var(--accent-border)' : 'var(--border-default)'))}`,
         }}>
           {employee.type}
         </div>
       </div>
 
       {/* 任务结果展示 */}
-      {taskResult && (isInRelationship || isExecutor) && (
+      {taskResult && (
         <div style={{
           marginTop: '10px',
           padding: '8px 10px',
-          background: 'rgba(16, 185, 129, 0.15)',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
+          background: 'var(--success-bg)',
+          border: '1px solid var(--success-border)',
           borderRadius: '10px',
           maxHeight: '50px',
           overflow: 'hidden',
         }}>
           <div style={{ 
             fontSize: '9px', 
-            color: '#34D399', 
+            color: 'var(--success)', 
             fontWeight: 600,
             marginBottom: '4px',
           }}>
@@ -225,7 +222,7 @@ function EmployeeNode({ data }: NodeProps) {
           </div>
           <div style={{ 
             fontSize: '10px', 
-            color: '#6EE7B7',
+            color: 'var(--success)',
             lineHeight: 1.4,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -244,31 +241,31 @@ function EmployeeNode({ data }: NodeProps) {
           type="source"
           position={Position.Bottom}
           style={{ 
-            background: isExecuting && isInRelationship ? '#06B6D4' : (isSuperadmin ? '#F59E0B' : (!isInRelationship ? '#475569' : config.color)), 
+            background: isExecuting && isInRelationship ? 'var(--accent)' : (isSuperadmin ? 'var(--warning)' : (!isInRelationship ? 'var(--border-default)' : config.color)), 
             width: '12px', 
             height: '12px',
-            border: '2px solid #0F172A'
+            border: '2px solid var(--bg-primary)'
           }}
         />
       )}
 
       <style>{`
         @keyframes nodePulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
-          50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(6, 182, 212, 0.6); }
+          0%, 100% { transform: scale(1); box-shadow: 0 0 20px var(--accent-muted); }
+          50% { transform: scale(1.05); box-shadow: 0 0 40px var(--accent); }
         }
         @keyframes nodeGlow {
-          0%, 100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
-          50% { box-shadow: 0 0 50px rgba(6, 182, 212, 0.8), 0 0 80px rgba(6, 182, 212, 0.4); }
+          0%, 100% { box-shadow: 0 0 20px var(--accent-muted); }
+          50% { box-shadow: 0 0 50px var(--accent), 0 0 80px var(--accent-muted); }
         }
         @keyframes nodeShimmer {
           0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.2); box-shadow: 0 0 30px rgba(6, 182, 212, 0.5); }
+          50% { filter: brightness(1.2); box-shadow: 0 0 30px var(--accent-muted); }
         }
         @keyframes nodeRing {
-          0% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
-          50% { box-shadow: 0 0 45px rgba(6, 182, 212, 0.7), 0 0 70px rgba(6, 182, 212, 0.3); }
-          100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
+          0% { box-shadow: 0 0 20px var(--accent-muted); }
+          50% { box-shadow: 0 0 45px var(--accent), 0 0 70px var(--accent-muted); }
+          100% { box-shadow: 0 0 20px var(--accent-muted); }
         }
       `}</style>
     </div>

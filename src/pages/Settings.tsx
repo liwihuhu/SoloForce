@@ -1,153 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const API_BASE = 'http://localhost:5301';
 
-interface ModelConfig {
+// LLM 配置接口
+export interface LLMConfig {
   id: string;
   name: string;
-  type: 'llm' | 'image';
-  provider: string;
+  provider: 'siliconflow' | 'openai' | 'custom';
+  baseUrl: string;
+  apiKey: string;
   model: string;
-  apiKey?: string;
-  baseUrl?: string;
   enabled: boolean;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export default function Settings() {
-  const [llmModels, setLlmModels] = useState<ModelConfig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [selectedModel, setSelectedModel] = useState<ModelConfig | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'llm' as 'llm' | 'image',
-    provider: '',
-    model: '',
+// 默认 LLM 配置
+const defaultLLMConfigs: LLMConfig[] = [
+  {
+    id: 'siliconflow-default',
+    name: '硅基流动 (SiliconFlow)',
+    provider: 'siliconflow',
+    baseUrl: 'https://api.siliconflow.cn/v1',
     apiKey: '',
-    baseUrl: '',
+    model: 'Qwen/Qwen2.5-7B-Instruct',
     enabled: true,
-    isDefault: false,
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  },
+];
+
+export default function Settings() {
   const [openclawConfig, setOpenclawConfig] = useState({
     endpoint: localStorage.getItem('openclaw_endpoint') || 'http://127.0.0.1:18789',
     token: localStorage.getItem('openclaw_token') || '',
     agentId: localStorage.getItem('openclaw_agent_id') || 'main',
   });
 
-  // 加载模型数据
-  const fetchModels = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/models`);
-      const data = await res.json();
-      if (data.success) {
-        setLlmModels(data.data.filter((m: ModelConfig) => m.type === 'llm'));
-      }
-    } catch (error) {
-      console.error('加载模型配置失败:', error);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchModels();
-  }, []);
-
-  // 打开新增弹窗
-  const openAddModal = (type: 'llm' | 'image') => {
-    setModalMode('add');
-    setFormData({
-      name: '',
-      type,
-      provider: '',
-      model: '',
-      apiKey: '',
-      baseUrl: '',
-      enabled: true,
-      isDefault: false,
-    });
-    setSelectedModel(null);
-    setShowModal(true);
-  };
-
-  // 打开编辑弹窗
-  const openEditModal = (model: ModelConfig) => {
-    setModalMode('edit');
-    setSelectedModel(model);
-    setFormData({
-      name: model.name,
-      type: model.type,
-      provider: model.provider,
-      model: model.model,
-      apiKey: model.apiKey || '',
-      baseUrl: model.baseUrl || '',
-      enabled: model.enabled,
-      isDefault: model.isDefault,
-    });
-    setShowModal(true);
-  };
-
-  // 提交表单
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.provider || !formData.model) return;
-
-    setSubmitting(true);
-    try {
-      if (modalMode === 'add') {
-        await fetch(`${API_BASE}/api/models`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-      } else if (selectedModel) {
-        await fetch(`${API_BASE}/api/models/${selectedModel.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-      }
-      setShowModal(false);
-      fetchModels();
-    } catch (error) {
-      console.error('保存模型配置失败:', error);
-    }
-    setSubmitting(false);
-  };
-
-  // 删除模型
-  const handleDelete = async (model: ModelConfig) => {
-    if (!confirm(`确定要删除模型 "${model.name}" 吗？`)) return;
-
-    try {
-      await fetch(`${API_BASE}/api/models/${model.id}`, {
-        method: 'DELETE',
-      });
-      fetchModels();
-    } catch (error) {
-      console.error('删除模型配置失败:', error);
-    }
-  };
-
-  // 切换启用状态
-  const toggleEnabled = async (model: ModelConfig) => {
-    try {
-      await fetch(`${API_BASE}/api/models/${model.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !model.enabled }),
-      });
-      fetchModels();
-    } catch (error) {
-      console.error('更新模型状态失败:', error);
-    }
-  };
+  // LLM 配置状态
+  const [llmConfigs, setLLMConfigs] = useState<LLMConfig[]>(() => {
+    const saved = localStorage.getItem('llm_configs');
+    return saved ? JSON.parse(saved) : defaultLLMConfigs;
+  });
+  const [editingLLM, setEditingLLM] = useState<LLMConfig | null>(null);
+  const [showLLMModal, setShowLLMModal] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // 保存 OpenClaw 配置
   const saveOpenclawConfig = () => {
@@ -200,206 +94,46 @@ export default function Settings() {
     setTesting(false);
   };
 
-  // 渲染模型列表
-  const renderModelList = (models: ModelConfig[], title: string, type: 'llm' | 'image') => (
-    <div style={{ marginBottom: '32px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '16px' 
-      }}>
-        <h3 style={{ 
-          fontSize: '18px', 
-          fontWeight: 600, 
-          color: '#F1F5F9',
-          margin: 0 
-        }}>
-          {title}
-        </h3>
-        <button
-          onClick={() => openAddModal(type)}
-          style={{
-            padding: '8px 16px',
-            background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '13px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(6, 182, 212, 0.3)',
-          }}
-        >
-          + 添加模型
-        </button>
-      </div>
-
-      {models.length === 0 ? (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '40px', 
-          color: '#64748B',
-          background: 'rgba(30, 41, 59, 0.5)',
-          borderRadius: '12px',
-        }}>
-          暂无配置，点击"添加模型"创建
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {models.map(model => (
-            <div
-              key={model.id}
-              style={{
-                background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%)',
-                borderRadius: '12px',
-                padding: '16px',
-                border: `1px solid ${model.isDefault ? 'rgba(6, 182, 212, 0.4)' : 'rgba(148, 163, 184, 0.2)'}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontWeight: 600, color: '#F1F5F9', fontSize: '15px' }}>
-                    {model.name}
-                  </span>
-                  {model.isDefault && (
-                    <span style={{
-                      padding: '2px 8px',
-                      background: 'rgba(6, 182, 212, 0.2)',
-                      color: '#06B6D4',
-                      borderRadius: '10px',
-                      fontSize: '11px',
-                    }}>
-                      默认
-                    </span>
-                  )}
-                  {!model.enabled && (
-                    <span style={{
-                      padding: '2px 8px',
-                      background: 'rgba(100, 116, 139, 0.3)',
-                      color: '#94A3B8',
-                      borderRadius: '10px',
-                      fontSize: '11px',
-                    }}>
-                      已禁用
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '12px', color: '#64748B' }}>
-                  {model.provider} · {model.model}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  onClick={() => toggleEnabled(model)}
-                  style={{
-                    padding: '6px 12px',
-                    background: model.enabled 
-                      ? 'rgba(16, 185, 129, 0.2)' 
-                      : 'rgba(100, 116, 139, 0.2)',
-                    color: model.enabled ? '#10B981' : '#94A3B8',
-                    border: `1px solid ${model.enabled ? 'rgba(16, 185, 129, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {model.enabled ? '已启用' : '已禁用'}
-                </button>
-                <button
-                  onClick={() => openEditModal(model)}
-                  style={{
-                    padding: '6px 12px',
-                    background: 'rgba(139, 92, 246, 0.2)',
-                    color: '#A78BFA',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  编辑
-                </button>
-                <button
-                  onClick={() => handleDelete(model)}
-                  style={{
-                    padding: '6px 12px',
-                    background: 'rgba(239, 68, 68, 0.2)',
-                    color: '#F87171',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  删除
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)',
-        color: '#64748B',
-      }}>
-        加载中...
-      </div>
-    );
-  }
-
   return (
     <div style={{ 
       padding: '24px', 
       height: '100%', 
       overflow: 'auto', 
-      background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)' 
+      background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)' 
     }}>
       <h2 style={{ 
         fontSize: '24px', 
         fontWeight: 600, 
         marginBottom: '24px',
-        background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+        background: 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
       }}>
-        模型配置
+        设置
       </h2>
 
-      {renderModelList(llmModels, '语言模型 (LLM)', 'llm')}
-
       {/* OpenClaw API 配置 */}
-      <div style={{ marginTop: '32px' }}>
+      <div>
         <h3 style={{ 
           fontSize: '18px', 
           fontWeight: 600, 
-          color: '#F1F5F9',
+          color: 'var(--text-primary)',
           marginBottom: '16px' 
         }}>
           OpenClaw API 配置
         </h3>
         
         <div style={{
-          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%)',
+          background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-primary) 100%)',
           borderRadius: '12px',
           padding: '20px',
           border: '1px solid rgba(148, 163, 184, 0.2)',
+          maxWidth: '600px',
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* API 端点 */}
             <div>
-              <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
                 API 端点
               </label>
               <input
@@ -414,7 +148,7 @@ export default function Settings() {
                   borderRadius: '8px',
                   fontSize: '14px',
                   background: 'rgba(15, 23, 42, 0.8)',
-                  color: '#F1F5F9',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                 }}
               />
@@ -422,7 +156,7 @@ export default function Settings() {
 
             {/* API Token */}
             <div>
-              <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
                 API Token
               </label>
               <input
@@ -437,7 +171,7 @@ export default function Settings() {
                   borderRadius: '8px',
                   fontSize: '14px',
                   background: 'rgba(15, 23, 42, 0.8)',
-                  color: '#F1F5F9',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                 }}
               />
@@ -445,7 +179,7 @@ export default function Settings() {
 
             {/* Agent ID */}
             <div>
-              <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
                 Agent ID
               </label>
               <input
@@ -460,7 +194,7 @@ export default function Settings() {
                   borderRadius: '8px',
                   fontSize: '14px',
                   background: 'rgba(15, 23, 42, 0.8)',
-                  color: '#F1F5F9',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                 }}
               />
@@ -472,7 +206,7 @@ export default function Settings() {
                 onClick={saveOpenclawConfig}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+                  background: 'linear-gradient(135deg, var(--accent) 0%, #0891B2 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -491,7 +225,7 @@ export default function Settings() {
                   background: testing 
                     ? 'rgba(100, 116, 139, 0.3)' 
                     : 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%)',
-                  color: testing ? '#94A3B8' : '#A78BFA',
+                  color: testing ? 'var(--text-secondary)' : 'var(--accent)',
                   border: testing ? 'none' : '1px solid rgba(139, 92, 246, 0.3)',
                   borderRadius: '8px',
                   fontSize: '14px',
@@ -511,7 +245,7 @@ export default function Settings() {
                 background: testResult.success 
                   ? 'rgba(16, 185, 129, 0.15)' 
                   : 'rgba(239, 68, 68, 0.15)',
-                color: testResult.success ? '#10B981' : '#F87171',
+                color: testResult.success ? 'var(--success)' : '#F87171',
                 border: `1px solid ${testResult.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
               }}>
                 {testResult.message}
@@ -521,22 +255,348 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* 大模型 API 配置 */}
+      <div style={{ marginTop: '32px' }}>
+        <h3 style={{ 
+          fontSize: '18px', 
+          fontWeight: 600, 
+          color: 'var(--text-primary)',
+          marginBottom: '16px' 
+        }}>
+          大模型 API 配置
+        </h3>
+        
+        <div style={{
+          background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-primary) 100%)',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid rgba(148, 163, 184, 0.2)',
+          maxWidth: '700px',
+        }}>
+          {/* 已有配置列表 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {llmConfigs.map(config => (
+              <div key={config.id} style={{
+                padding: '16px',
+                background: 'rgba(15, 23, 42, 0.6)',
+                borderRadius: '10px',
+                border: config.enabled ? '1px solid rgba(6, 182, 212, 0.4)' : '1px solid rgba(148, 163, 184, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: config.enabled 
+                      ? 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)' 
+                      : 'rgba(100, 116, 139, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '18px',
+                  }}>
+                    {config.provider === 'siliconflow' ? '💧' : config.provider === 'openai' ? '🤖' : '🔧'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {config.name}
+                      {config.enabled && (
+                        <span style={{
+                          marginLeft: '8px',
+                          padding: '2px 8px',
+                          fontSize: '10px',
+                          background: 'rgba(16, 185, 129, 0.2)',
+                          color: 'var(--success)',
+                          borderRadius: '10px',
+                        }}>
+                          已启用
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {config.model} • {config.baseUrl}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => { setEditingLLM(config); setShowLLMModal(true); }}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(100, 116, 139, 0.2)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: 'var(--text-secondary)',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    onClick={() => {
+                      const updated = llmConfigs.map(c => 
+                        c.id === config.id ? { ...c, enabled: !c.enabled } : c
+                      );
+                      setLLMConfigs(updated);
+                      localStorage.setItem('llm_configs', JSON.stringify(updated));
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      background: config.enabled 
+                        ? 'rgba(239, 68, 68, 0.2)' 
+                        : 'rgba(16, 185, 129, 0.2)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: config.enabled ? '#F87171' : 'var(--success)',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {config.enabled ? '禁用' : '启用'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 添加按钮 */}
+          <button
+            onClick={() => { setEditingLLM(null); setShowLLMModal(true); }}
+            style={{
+              marginTop: '16px',
+              padding: '10px 20px',
+              background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(6, 182, 212, 0.1) 100%)',
+              border: '1px dashed rgba(6, 182, 212, 0.5)',
+              borderRadius: '10px',
+              color: 'var(--accent)',
+              fontSize: '13px',
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            + 添加大模型配置
+          </button>
+        </div>
+      </div>
+
+      {/* LLM 配置弹窗 */}
+      {showLLMModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            borderRadius: '16px',
+            padding: '24px',
+            width: '480px',
+            maxWidth: '90vw',
+            border: '1px solid rgba(148, 163, 184, 0.2)',
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '20px' }}>
+              {editingLLM ? '编辑大模型配置' : '添加大模型配置'}
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* 提供者 */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                  提供者
+                </label>
+                <select
+                  value={editingLLM?.provider || 'siliconflow'}
+                  onChange={e => setEditingLLM(editingLLM ? { ...editingLLM, provider: e.target.value as any } : null as any)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="siliconflow">硅基流动 (SiliconFlow)</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="custom">自定义</option>
+                </select>
+              </div>
+
+              {/* 名称 */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                  配置名称
+                </label>
+                <input
+                  type="text"
+                  value={editingLLM?.name || ''}
+                  onChange={e => setEditingLLM(editingLLM ? { ...editingLLM, name: e.target.value } : null as any)}
+                  placeholder="例如：硅基流动 Qwen-7B"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Base URL */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                  API Base URL
+                </label>
+                <input
+                  type="text"
+                  value={editingLLM?.baseUrl || ''}
+                  onChange={e => setEditingLLM(editingLLM ? { ...editingLLM, baseUrl: e.target.value } : null as any)}
+                  placeholder="https://api.siliconflow.cn/v1"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* API Key */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                  API Key
+                </label>
+                <input
+                  type="password"
+                  value={editingLLM?.apiKey || ''}
+                  onChange={e => setEditingLLM(editingLLM ? { ...editingLLM, apiKey: e.target.value } : null as any)}
+                  placeholder="输入 API Key"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* 模型 */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                  模型名称
+                </label>
+                <input
+                  type="text"
+                  value={editingLLM?.model || ''}
+                  onChange={e => setEditingLLM(editingLLM ? { ...editingLLM, model: e.target.value } : null as any)}
+                  placeholder="Qwen/Qwen2.5-7B-Instruct"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* 按钮 */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={() => setShowLLMModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px 20px',
+                  background: 'rgba(100, 116, 139, 0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'var(--text-secondary)',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  if (!editingLLM?.name || !editingLLM?.baseUrl || !editingLLM?.apiKey || !editingLLM?.model) {
+                    alert('请填写完整信息');
+                    return;
+                  }
+                  const newConfig = {
+                    ...editingLLM,
+                    id: editingLLM?.id || `llm-${Date.now()}`,
+                  };
+                  const updated = editingLLM?.id 
+                    ? llmConfigs.map(c => c.id === editingLLM!.id ? newConfig : c)
+                    : [...llmConfigs, newConfig];
+                  setLLMConfigs(updated);
+                  localStorage.setItem('llm_configs', JSON.stringify(updated));
+                  setShowLLMModal(false);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 20px',
+                  background: 'linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 数据导入/导出 */}
       <div style={{ marginTop: '32px' }}>
         <h3 style={{ 
           fontSize: '18px', 
           fontWeight: 600, 
-          color: '#F1F5F9',
+          color: 'var(--text-primary)',
           marginBottom: '16px' 
         }}>
           数据管理
         </h3>
         
         <div style={{
-          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%)',
+          background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-primary) 100%)',
           borderRadius: '12px',
           padding: '20px',
           border: '1px solid rgba(148, 163, 184, 0.2)',
+          maxWidth: '600px',
         }}>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
@@ -616,216 +676,11 @@ export default function Settings() {
               />
             </label>
           </div>
-          <p style={{ fontSize: '12px', color: '#64748B', marginTop: '12px' }}>
-            导出将下载所有员工、团队、关系、任务历史和模型配置数据。导入将覆盖现有数据。
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
+            导出将下载所有员工、团队、关系、任务历史数据。导入将覆盖现有数据。
           </p>
         </div>
       </div>
-
-      {/* 弹窗 */}
-      {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(4px)',
-        }} onClick={() => setShowModal(false)}>
-          <div style={{
-            background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
-            borderRadius: '16px',
-            padding: '24px',
-            width: '500px',
-            maxHeight: '80vh',
-            overflow: 'auto',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-          }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ 
-              margin: '0 0 20px 0', 
-              fontSize: '18px', 
-              fontWeight: 600,
-              color: '#F1F5F9',
-            }}>
-              {modalMode === 'add' ? '添加模型' : '编辑模型'}
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
-                  模型名称 <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="如：Qwen2.5-7B"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
-                  提供商 <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.provider}
-                  onChange={e => setFormData({ ...formData, provider: e.target.value })}
-                  placeholder="如：硅基流动"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
-                  模型标识 <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.model}
-                  onChange={e => setFormData({ ...formData, model: e.target.value })}
-                  placeholder="如：Qwen/Qwen2.5-7B-Instruct"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
-                  API Key（可选）
-                </label>
-                <input
-                  type="password"
-                  value={formData.apiKey}
-                  onChange={e => setFormData({ ...formData, apiKey: e.target.value })}
-                  placeholder="留空则使用默认配置"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', marginBottom: '6px', color: '#94A3B8' }}>
-                  基础 URL（可选）
-                </label>
-                <input
-                  type="text"
-                  value={formData.baseUrl}
-                  onChange={e => setFormData({ ...formData, baseUrl: e.target.value })}
-                  placeholder="如：https://api.siliconflow.cn/v1"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    color: '#F1F5F9',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={formData.enabled}
-                    onChange={e => setFormData({ ...formData, enabled: e.target.checked })}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>启用</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={formData.isDefault}
-                    onChange={e => setFormData({ ...formData, isDefault: e.target.checked })}
-                    style={{ width: '16px', height: '16px' }}
-                  />
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>设为默认</span>
-                </label>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  background: 'rgba(71, 85, 105, 0.3)',
-                  color: '#94A3B8',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                }}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !formData.name || !formData.provider || !formData.model}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  opacity: submitting ? 0.6 : 1,
-                }}
-              >
-                {submitting ? '保存中...' : '保存'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
